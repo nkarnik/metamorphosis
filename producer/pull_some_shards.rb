@@ -26,14 +26,15 @@ directories.each do |dir|
     shard_count += 1
     temp_file_name = shard_path.split("/").last(2).join("_")
     File.open(temp_file_name, 'wb') do |file|
-      bucket.objects[files.first].read do |chunk|
+      bucket.objects[shard_path].read do |chunk|
         file.write(chunk)
       end
     end
     # File is downloaded 
-    gz = Zlib::GzipReader.new(s3file)
+    gz = Zlib::GzipReader.new(temp_file_name)
     gz.each_line do |line|
-      producer.send_messages([Poseidon::MessageToSend.new("some_homepages", line)])
+      #producer.send_messages([Poseidon::MessageToSend.new("some_homepages", line)])
+      puts line
     end
     puts "Shard #{temp_file_path} completed. Total files done: #{shard_count}"
     

@@ -11,6 +11,7 @@ AWS.config(
            :secret_access_key => 'F9rmZ36zlk2rNNRunsbYQh53+OF6rPdzy6HtI6bf'
           )
 s3 = AWS::S3.new
+producer = Poseidon::Producer.new(["10.167.177.28:9092", "10.184.165.95:9092" ], "st1", :type => :sync)
 
 puts "Reading dir list from s3."
 
@@ -31,10 +32,10 @@ directories.each do |dir|
       end
     end
     # File is downloaded 
-    gz = Zlib::GzipReader.new(temp_file_name)
+    gz = Zlib::GzipReader.new(open(temp_file_name))
     gz.each_line do |line|
-      #producer.send_messages([Poseidon::MessageToSend.new("some_homepages", line)])
-      puts line
+      producer.send_messages([Poseidon::MessageToSend.new("some_homepages", line)])
+      
     end
     puts "Shard #{temp_file_path} completed. Total files done: #{shard_count}"
     

@@ -35,10 +35,9 @@ directories.each do |dir|
     gz = Zlib::GzipReader.new(open(temp_file_name))
     gz.each_line do |line|
       producer.send_messages([Poseidon::MessageToSend.new("some_homepages", line)])
-      
     end
-    puts "Shard #{temp_file_path} completed. Total files done: #{shard_count}"
-    
+    puts "Shard #{temp_file_name} completed. Total files done: #{shard_count}"
+    File.delete(temp_file_name)
     if shard_count == num_shards_to_pull
       abort("Completed #{shard_count} shards. Goodbye!")
     end

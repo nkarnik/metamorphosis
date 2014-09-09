@@ -27,6 +27,9 @@ AWS.config(
 s3 = AWS::S3.new
 
 def find_broker(env, attrib = 'fqdn')
+  if e == "local"
+    return ["localhost:9092"]
+  end
   results = `knife search node "role:kafka_broker AND chef_environment:#{env}" -F json -a fqdn  -c ~/zb1/infrastructure/chef/.chef/knife.rb`
   hash = JSON.parse(results)
   hash["rows"].map do |rec|
@@ -69,6 +72,7 @@ st = Time.now
 
 directories.each do |dir|
   puts shards
+  puts dir
   break if shards == 0
 
   `rm -r /tmp/kfk2`
@@ -93,14 +97,24 @@ directories.each do |dir|
             path = "/tmp/kfk2/" + f.split("/").last(2).join("_")
             File.open(path, 'wb') do |file|
               bucket.objects[f].read do |chunk|
-                file.write(chunk)
+                begin
+                  file.write(chunk)
+                rescue
+                  puts "s3 error"
+                  `echo "s3 error!" >> log_kafka`
+                end
               end
             end
             s3file = open(path)
 
             gz = Zlib::GzipReader.new(s3file)
             gz.each_line do |line|
-              producer.send_messages([Poseidon::MessageToSend.new(topic, line)])
+              begin
+                producer.send_messages([Poseidon::MessageToSend.new(topic, line)])
+              rescue Exception => e
+                puts "empty message error"
+                `echo "empty message error!" >> log_kafka`
+              end
             end
             diff = Time.now - st
             info = diff.to_s + "   " + path + "   shards left: " + shards.to_s + " current time: " + Time.now.to_s

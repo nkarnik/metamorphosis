@@ -58,6 +58,10 @@ ips.each do |ip|
   fqdns << fqdn
 end
 
+if e == "local"
+  fqdns = ["localhost:9092"]
+end
+
 puts fqdns
 
 #create producer with list of domains

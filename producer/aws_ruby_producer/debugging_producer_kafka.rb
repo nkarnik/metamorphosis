@@ -1,12 +1,9 @@
 require "json"
 require 'thread'
-require "aws"
+require "aws-sdk"
 require "poseidon"
 require "optparse"
 require 'pry'
-
-`rm -r /tmp/kfk2`
-`mkdir /tmp/kfk2`
 
 def log(msg)
   if @lf.nil?
@@ -32,7 +29,7 @@ opt_parser = OptionParser.new do |opt|
   opt.separator  "Options:"
     
   opt.on("--broker_id broker_id",Integer, "Number of shards to download") do |broker_id|
-    $options[:broker_id] = broker_id
+    $options[:broker_id] = broker_id.to_i
   end
   
   opt.on("--threads THREADS",Integer, "Number of threads") do |threads|
@@ -172,7 +169,7 @@ num_threads.times do |thread_num|
       # log "producer: #{producer} for node: #{producer_fqdn}"
       while f = work_q.pop(true)
         per_shard_time = Time.now
-        path = "/tmp/kfk2/" + f.split("/").last(2).join("_")
+        path = "/tmp/" + f.split("/").last(2).join("_")
         File.open(path, 'wb') do |file|
           bucket.objects[f].read do |chunk|
             begin
@@ -183,7 +180,7 @@ num_threads.times do |thread_num|
           end
         end
         s3file = open(path)
-
+        
         gz = Zlib::GzipReader.new(s3file)
         msgs = []
         gz.each_line do |line|
@@ -196,9 +193,10 @@ num_threads.times do |thread_num|
         # Send each shard to an arbitrary partition
         producer = producers_for_thread.sample
         producer.send_messages(msgs)
+        File.delete path
         # binding.pry
         log( "#{Time.now.to_s}:: Producer: #{producer.object_id} took: #{Time.now - per_shard_time} seconds. #{path} shards remaing: #{work_q.size}.  Since start: #{Time.now - start_time}")
-
+        
             
       end
     rescue ThreadError

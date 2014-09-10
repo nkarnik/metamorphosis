@@ -5,17 +5,36 @@ require "poseidon"
 require "optparse"
 require 'pry'
 
+`rm -r /tmp/kfk2`
+`mkdir /tmp/kfk2`
+
+def log(msg)
+  if @lf.nil?
+    @lf = File.open(LOGFILE, 'a')
+  end
+  puts msg
+  @lf.write "#{Time.now}: #{msg}\n"
+  @lf.flush
+end
+
+AWS.config(
+          :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
+          :secret_access_key => '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'
+          )
+
+s3 = AWS::S3.new
+bucket = s3.buckets["fatty.zillabyte.com"]
+
 $options = {}
 opt_parser = OptionParser.new do |opt|
   opt.banner = "Usage: --topic --env --shards --threads"
   opt.separator  ""
   opt.separator  "Options:"
     
-  opt.on("--shards NUM",Integer, "Number of shards to download") do |num|
-    $options[:num_shards] = num
+  opt.on("--broker_id broker_id",Integer, "Number of shards to download") do |broker_id|
+    $options[:broker_id] = broker_id
   end
   
-
   opt.on("--threads THREADS",Integer, "Number of threads") do |threads|
     $options[:threads] = threads
   end
@@ -27,11 +46,6 @@ opt_parser = OptionParser.new do |opt|
   opt.on("--topic TOPIC", String, "Set the AMI to use") do |topic|
     $options[:topic] = topic
   end
-
-  opt.on("--partition", String, "Produce to a specific partition") do |topic|
-    $options[:partition] = partition
-  end
-
 end
 
 opt_parser.parse!
@@ -54,21 +68,6 @@ puts "Options: #{$options}"
 LOGFILE = "kafka_producer.log"
 `touch #{LOGFILE}`
 
-def log(msg)
-  if @lf.nil?
-    @lf = File.open(LOGFILE, 'a')
-  end
-  puts msg
-  @lf.write "#{Time.now}: #{msg}\n"
-  @lf.flush
-end
-
-AWS.config(
-          :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
-          :secret_access_key => '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'
-          )
-
-s3 = AWS::S3.new
 
 def find_broker(env, attrib = 'fqdn')
   results = `knife search node "role:kafka_broker AND chef_environment:#{env}" -F json -a fqdn  -c ~/zb1/infrastructure/chef/.chef/knife.rb`
@@ -85,34 +84,42 @@ end
 
 puts "fqdns: #{fqdns}"
 
-#create producer with list of domains
-
-bucket = s3.buckets["fatty.zillabyte.com"]
-tree = bucket.as_tree(:prefix => 'data/homepages/2014/0620')
-directories = tree.children.select(&:branch?).collect(&:prefix)
 
 
-`rm -r /tmp/kfk2`
-`mkdir /tmp/kfk2`
 
-shards = 1
-directories.each do |dir|
-  # puts "shards: #{shards}"
-  # puts "dir: #{dir}"
-  break if shards == num_shards
-  files = bucket.as_tree(:prefix => dir).children.select(&:leaf?).collect(&:key)
-  files.each do |file|
-    work_q << file
-    # log "Appended shard [#{shards}/#{num_shards}]: #{file}"
-    break if shards == num_shards
-    shards += 1
+
+## Manifest distribution
+manifest_path = "data/homepages/2014/0620.manifest"
+local_manifest = "manifest"
+
+log "Downloading manifest"
+
+File.open(local_manifest, 'wb') do |file|
+  bucket.objects[manifest_path].read do |chunk|
+    begin
+      file.write(chunk)
+    rescue
+      log "s3 error for path: #{f}"
+    end
   end
 end
 
-log "\n#{shards.size} shards appended\n"
+log "Distributing manifest"
+line_num = 1
+if $options[:broker_id]
+  File.open(local_manifest) do |file|
+    file.each_line do |line|
+      if line_num % fqdns.size == $options[:broker_id]
+        work_q << line.chomp.gsub("s3://fatty.zillabyte.com/", "") # Only need path
+      end
+      line_num += 1
+    end
+  end
+end
 
-
-st = Time.now
+log "Manifest distributed, in queue: #{work_q.size}"
+# binding.pry
+return if work_q.size == 0
 
 seed_brokers = fqdns
 broker_pool = Poseidon::BrokerPool.new("fetch_metadata_client", seed_brokers)
@@ -123,25 +130,46 @@ metadata = cluster_metadata.topic_metadata[topic]
 num_partitions = metadata.partition_count
 @leaders_per_partition = []
 metadata.partition_count.times do |part_num|
-  @leaders_per_partition << cluster_metadata.lead_broker_for_partition(topic, 0).host
+  @leaders_per_partition << cluster_metadata.lead_broker_for_partition(topic, part_num).host
 end
 
-log "Leaders per partition: #{@leaders_per_partition}"
+# log "Leaders per partition: #{leaders_per_partition}"
+partitions_per_leader = {}
+@leaders_per_partition.each_with_index do |ip, index|
+  if partitions_per_leader[ip].nil?
+    partitions_per_leader[ip] = []
+  end
+  partitions_per_leader[ip] << index
+end
 
+this_host = `hostname`.chomp() + ".ec2.internal"
+partitions_on_localhost = partitions_per_leader[this_host] || []
+log "Partitions on this host: #{partitions_on_localhost.size}"
+# log @partitions_per_leader
+
+def get_producer_for_partition(partition_num)
+  single_partitioner = Proc.new { |key, partition_count| partition_num  } # Will always right to a single partition
+  producer_fqdn = @leaders_per_partition[partition_num]
+  return Poseidon::Producer.new([producer_fqdn], "producer_#{partition_num}", :type => :sync, :partitioner => single_partitioner)
+end
+
+@producers = partitions_on_localhost.map{|partition| get_producer_for_partition(partition)}
+
+# log @producers
+log "#{@producers.size} producers created"
 # binding.pry
 
-start = Time.now
-puts "Start time: #{start}"
+start_time = Time.now
+puts "Start time: #{start_time}"
 
 workers = []
-num_partitions.times do |partition_num|
+num_threads.times do |thread_num|
   
   t = Thread.new do
     begin
-      single_partitioner = Proc.new { |key, partition_count| partition_num  } # Will always right to a single partition
-      producer_fqdn = @leaders_per_partition[partition_num]
-      producer = Poseidon::Producer.new([producer_fqdn], "producer_#{partition_num}", :type => :sync, :partitioner => single_partitioner)
-      puts "producer: #{producer} for node: #{producer_fqdn}"
+      # We want producers exclusive to threads. 
+      producers_for_thread = @producers.select.with_index{|_,i| i % num_threads == thread_num}
+      # log "producer: #{producer} for node: #{producer_fqdn}"
       while f = work_q.pop(true)
         per_shard_time = Time.now
         path = "/tmp/kfk2/" + f.split("/").last(2).join("_")
@@ -150,8 +178,7 @@ num_partitions.times do |partition_num|
             begin
               file.write(chunk)
             rescue
-              log "s3 error"
-
+              log "s3 error for path: #{f}"
             end
           end
         end
@@ -166,8 +193,11 @@ num_partitions.times do |partition_num|
             log "empty message error"
           end
         end 
+        # Send each shard to an arbitrary partition
+        producer = producers_for_thread.sample
         producer.send_messages(msgs)
-        log( "#{Time.now.to_s}:: #{path} shards completed:  #{work_q.size}. per shard time: #{Time.now - per_shard_time}. Total time since start: #{Time.now - st}")
+        # binding.pry
+        log( "#{Time.now.to_s}:: Producer: #{producer.object_id} took: #{Time.now - per_shard_time} seconds. #{path} shards remaing: #{work_q.size}.  Since start: #{Time.now - start_time}")
 
             
       end
@@ -179,10 +209,6 @@ end
 
 workers.map(&:join); 
 
-puts "Done with the threads"
-
-endt = Time.now
-puts endt - start
-
-endt = Time.now
-puts endt - st
+log "Done with the threads"
+elapsed_time = Time.now - start_time
+log "Total shards into kafka: #{num_shards} shards with #{num_threads} threads in #{elapsed_time} seconds. Avg time per shard: #{elapsed_time/num_shards}"

@@ -2,23 +2,61 @@ require "json"
 require 'thread'
 require "aws"
 require "poseidon"
+require "optparse"
+require 'pry'
+
+$options = {}
+opt_parser = OptionParser.new do |opt|
+  opt.banner = "Usage: --topic --env --shards --threads"
+  opt.separator  ""
+  opt.separator  "Options:"
+    
+  opt.on("--shards NUM",Integer, "Number of shards to download") do |num|
+    $options[:num_shards] = num
+  end
+  
+
+  opt.on("--threads THREADS",Integer, "Number of threads") do |threads|
+    $options[:threads] = threads
+  end
+
+  opt.on("--env ENV", String, "Env? prod,test,local") do |env|
+    $options[:env] = env
+  end
+  
+  opt.on("--topic TOPIC", String, "Set the AMI to use") do |topic|
+    $options[:topic] = topic
+  end
+end
+
+opt_parser.parse!
 
 #Multithreaded
 work_q = Queue.new
 
-
 #first arg = # of shards to pull
-shards = ARGV.first.to_i
+shards = $options[:num_shards] || 5
 
 #second arg = environment (test/prod)
-e = ARGV[1].to_s
+e = $options[:env] || "prod"
 
 #third arg = topic name
-topic = ARGV[2].to_s
-puts topic
+topic = $options[:topic] || "s4"
 
+num_threads = $options[:threads] || "5"
+puts $options
 
-`touch log_kafka`
+LOGFILE = "kafka_producer.log"
+`touch #{LOGFILE}`
+
+def log(msg)
+  if @lf.nil?
+    @lf = File.open(LOGFILE, 'a')
+  end
+  puts msg
+  @lf.write "#{Time.now}: #{msg}\n"
+  @lf.flush
+end
 
 AWS.config(
           :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
@@ -52,7 +90,7 @@ ips.each do |ip|
   s = ip.split(".")
   t = s[0].split("-")
   fqdn = t[1, t.length].join(".") + ":9092"
-  puts fqdn
+  # puts fqdn
   fqdns << fqdn
 end
 
@@ -60,7 +98,7 @@ if e == "local"
   fqdns = ["localhost:9092"]
 end
 
-puts fqdns
+puts "fqdns: #{fqdns}"
 
 #create producer with list of domains
 
@@ -71,9 +109,27 @@ directories = tree.children.select(&:branch?).collect(&:prefix)
 
 st = Time.now
 
+seed_brokers = fqdns
+broker_pool = Poseidon::BrokerPool.new("fetch_metadata_client", seed_brokers)
+cluster_metadata = Poseidon::ClusterMetadata.new
+cluster_metadata.update(broker_pool.fetch_metadata([topic]))
+
+metadata = cluster_metadata.topic_metadata[topic]
+num_partitions = metadata.partition_count
+leaders_per_partition = []
+metadata.partition_count.times do |part_num|
+  leaders_per_partition << cluster_metadata.lead_broker_for_partition(topic, 0).host
+end
+
+num_threads = num_partitions
+
+log "done"
+
+binding.pry
+
 directories.each do |dir|
-  puts shards
-  puts dir
+  puts "shards: #{shards}"
+  puts "dir: #{dir}"
   break if shards == 0
 
   `rm -r /tmp/kfk2`
@@ -91,10 +147,12 @@ directories.each do |dir|
   start = Time.now
   puts start
   workers = []
-  10.times do |thread_num|
+  num_threads.times do |thread_num|
     t = Thread.new do
       begin
-	producer = Poseidon::Producer.new([fqdns[thread_num % fqdns.size]], "st1", :type => :sync)
+        single_partitioner = Proc.new { |key, partition_count| thread_num  } # Will always right to a single partition
+
+	producer = Poseidon::Producer.new([fqdns[thread_num % fqdns.size]], "producer_#{thread_num}", :type => :sync)
 	puts "producer: #{producer} for node: #{fqdns[thread_num % fqdns.size]}"
         while f = work_q.pop(true)
 
@@ -105,8 +163,8 @@ directories.each do |dir|
                 begin
                   file.write(chunk)
                 rescue
-                  puts "s3 error"
-                  `echo "s3 error!" >> log_kafka`
+                  log "s3 error"
+
                 end
               end
             end
@@ -117,14 +175,12 @@ directories.each do |dir|
               begin
                 producer.send_messages([Poseidon::MessageToSend.new(topic, line)])
               rescue Exception => e
-                puts "empty message error"
-                `echo "empty message error!" >> log_kafka`
+                log "empty message error"
               end
             end
             diff = Time.now - st
-            info = diff.to_s + "   " + path + "   shards left: " + shards.to_s + " current time: " + Time.now.to_s
-            puts info
-            `echo #{info} >> log_kafka`
+            log(diff.to_s + "   " + path + "   shards left: " + shards.to_s + " current time: " + Time.now.to_s)
+            
         end
       rescue ThreadError
       end

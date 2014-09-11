@@ -9,7 +9,7 @@ def log(msg)
   if @lf.nil?
     @lf = File.open(LOGFILE, 'a')
   end
-  puts msg
+  puts "#{Time.now}: #{msg}\n"
   @lf.write "#{Time.now}: #{msg}\n"
   @lf.flush
 end
@@ -27,9 +27,13 @@ opt_parser = OptionParser.new do |opt|
   opt.banner = "Usage: --topic --env --shards --threads"
   opt.separator  ""
   opt.separator  "Options:"
-    
-  opt.on("--broker_id broker_id",Integer, "Number of shards to download") do |broker_id|
-    $options[:broker_id] = broker_id.to_i
+     
+  opt.on("--shards SHARDS",Integer, "Number of shards to download") do |shards|
+    $options[:num_shards] = shards
+  end
+
+  opt.on("--broker_id BROKER",Integer, "Which broker is this?") do |broker|
+    $options[:broker_id] = broker.to_i
   end
   
   opt.on("--threads THREADS",Integer, "Number of threads") do |threads|
@@ -50,16 +54,11 @@ opt_parser.parse!
 #Multithreaded
 work_q = Queue.new
 
-#first arg = # of shards to pull
-num_shards = $options[:num_shards].to_i || 5
+num_shards    = $options[:num_shards].to_i
+env           = $options[:env] || "prod"
+topic         = $options[:topic] || "s4"
+num_threads   = $options[:threads].to_i || "5"
 
-#second arg = environment (test/prod)
-env = $options[:env] || "prod"
-
-#third arg = topic name
-topic = $options[:topic] || "s4"
-
-num_threads = $options[:threads].to_i || "5"
 puts "Options: #{$options}"
 
 LOGFILE = "kafka_producer.log"
@@ -101,11 +100,13 @@ File.open(local_manifest, 'wb') do |file|
   end
 end
 
-log "Distributing manifest"
+log "Distributing manifest. Looking for #{num_shards} shards"
+
 line_num = 1
 if $options[:broker_id]
   File.open(local_manifest) do |file|
     file.each_line do |line|
+      break if work_q.size == num_shards
       if line_num % fqdns.size == $options[:broker_id]
         work_q << line.chomp.gsub("s3://fatty.zillabyte.com/", "") # Only need path
       end
@@ -140,20 +141,21 @@ partitions_per_leader = {}
 end
 
 this_host = `hostname`.chomp() + ".ec2.internal"
-partitions_on_localhost = partitions_per_leader[this_host] || []
-log "Partitions on this host: #{partitions_on_localhost.size}"
+@partitions_on_localhost = partitions_per_leader[this_host] || []
+log "Partitions on this host: #{@partitions_on_localhost.size}"
 # log @partitions_per_leader
 
 def get_producer_for_partition(partition_num)
   single_partitioner = Proc.new { |key, partition_count| partition_num  } # Will always right to a single partition
   producer_fqdn = @leaders_per_partition[partition_num]
-  return Poseidon::Producer.new([producer_fqdn], "producer_#{partition_num}", :type => :sync, :partitioner => single_partitioner)
+  return Poseidon::Producer.new([producer_fqdn.split(".").first.gsub("ip-", "").gsub("-",".") + ":9092"], "producer_#{partition_num}", :type => :sync, :partitioner => single_partitioner)
 end
 
-@producers = partitions_on_localhost.map{|partition| get_producer_for_partition(partition)}
+# @producers = @partitions_on_localhost.map{|partition| get_producer_for_partition(partition)}
+@producer_hash = Hash.new {|hash, partition| hash[partition] = get_producer_for_partition(partition)}
 
 # log @producers
-log "#{@producers.size} producers created"
+# log "#{@producers.size} producers created"
 # binding.pry
 
 start_time = Time.now
@@ -165,8 +167,9 @@ num_threads.times do |thread_num|
   t = Thread.new do
     begin
       # We want producers exclusive to threads. 
-      producers_for_thread = @producers.select.with_index{|_,i| i % num_threads == thread_num}
+      # producers_for_thread = @producers.select.with_index{|_,i| i % num_threads == thread_num}
       # log "producer: #{producer} for node: #{producer_fqdn}"
+      num = 0
       while f = work_q.pop(true)
         per_shard_time = Time.now
         path = "/tmp/" + f.split("/").last(2).join("_")
@@ -179,27 +182,45 @@ num_threads.times do |thread_num|
             end
           end
         end
+
+        partition = @partitions_on_localhost.sample
+        producer = @producer_hash[partition]
+
         s3file = open(path)
-        
+        log "Downloaded: #{path} in #{Time.now - per_shard_time}"
         gz = Zlib::GzipReader.new(s3file)
         msgs = []
+        sent_messages = 0
+        batch_size = 100
         gz.each_line do |line|
           begin
-            msgs << Poseidon::MessageToSend.new(topic, line)
+            msgs << Poseidon::MessageToSend.new(topic, "#{num}"+line[0..1000])
+            num += 1
+            if(msgs.size == batch_size)
+              unless producer.send_messages(msgs)
+                log "Message failed: Line length #{line.size}"
+              end
+              sent_messages += batch_size
+              msgs = []
+            end
+            # producer.send_messages([Poseidon::MessageToSend.new(topic, line)])
+            # binding.pry
           rescue Exception => e
-            log "empty message error"
+            log "Error: #{e.message}"
           end
         end 
-        # Send each shard to an arbitrary partition
-        producer = producers_for_thread.sample
-        producer.send_messages(msgs)
-        File.delete path
+
         # binding.pry
-        log( "#{Time.now.to_s}:: Producer: #{producer.object_id} took: #{Time.now - per_shard_time} seconds. #{path} shards remaing: #{work_q.size}.  Since start: #{Time.now - start_time}")
+        # Send each shard to an arbitrary partition
+        # producer.send_messages(msgs)
+        File.delete path
+
+        log( "Partition: #{partition} took: #{Time.now - per_shard_time} seconds for #{sent_messages} msgs. #{path} shards remaing: #{work_q.size}.  Since start: #{Time.now - start_time}")
         
             
       end
-    rescue ThreadError
+    rescue ThreadError => te
+      log "Thread Errored: #{te.message}"
     end
   end
   workers << t

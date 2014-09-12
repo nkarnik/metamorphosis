@@ -9,7 +9,7 @@ def log(msg)
   if @lf.nil?
     @lf = File.open(LOGFILE, 'a')
   end
-  puts "#{Time.now}: #{msg}\n"
+  puts "#{msg}\n"
   @lf.write "#{Time.now}: #{msg}\n"
   @lf.flush
 end
@@ -47,7 +47,7 @@ opt_parser = OptionParser.new do |opt|
   opt.on("--topic TOPIC", String, "Required. Set the Topic to use") do |topic|
     $options[:topic] = topic
   end
-  
+ 
   opt.on("-h","--help","help") do
     puts opt_parser
     exit
@@ -59,14 +59,14 @@ opt_parser.parse!
 #Multithreaded
 work_q = Queue.new
 
-num_shards    = $options[:num_shards].to_i || 0
-env           = $options[:env] || "prod"
-
 if $options[:topic].nil?
   puts opt_parser
   exit
 end
 
+
+num_shards    = $options[:num_shards].to_i || 0
+env           = $options[:env] || "prod"
 topic         = $options[:topic] 
 num_threads   = $options[:threads].to_i || "1"
 
@@ -110,22 +110,24 @@ end
 
 log "Distributing manifest. Looking for #{num_shards} shards"
 
+
 line_num = 1
 if $options[:broker_id]
   File.open(local_manifest) do |file|
     file.each_line do |line|
-      # break if work_q.size == num_shards
+      break if work_q.size == $options[:num_shards]
       if line_num % fqdns.size == $options[:broker_id]
         work_q << line.chomp.gsub("s3://fatty.zillabyte.com/", "") # Only need path
       end
       line_num += 1
     end
+
   end
 end
 
 log "Manifest distributed, in queue: #{work_q.size}"
 # binding.pry
-return if work_q.size == 0
+exit if work_q.size == 0
 
 
 ## Get Cluster metadata for topic
@@ -157,7 +159,13 @@ log "Partitions on this host: #{@partitions_on_localhost.size}"
 def get_producer_for_partition(partition_num)
   single_partitioner = Proc.new { |key, partition_count| partition_num  } # Will always right to a single partition
   producer_fqdn = @leaders_per_partition[partition_num]
-  return Poseidon::Producer.new([producer_fqdn.split(".").first.gsub("ip-", "").gsub("-",".") + ":9092"], "producer_#{partition_num}", :type => :sync, :partitioner => single_partitioner)
+  return Poseidon::Producer.new([producer_fqdn.split(".").first.gsub("ip-", "").gsub("-",".") + ":9092"], 
+                                "producer_#{partition_num}", 
+                                :type => :sync, 
+                                :partitioner => single_partitioner,  
+                                # :snappy Unimplemented in Poseidon. Should be easy to add into 
+                                # https://github.com/bpot/poseidon/blob/master/lib/poseidon/compression/snappy_codec.rb
+                                :compression_codec => :gzip) 
 end
 
 # @producers = @partitions_on_localhost.map{|partition| get_producer_for_partition(partition)}
@@ -181,22 +189,33 @@ num_threads.times do |thread_num|
       # log "producer: #{producer} for node: #{producer_fqdn}"
 
 
+      _s3 = AWS::S3.new
+      # Bucket per thread
+      _bucket = _s3.buckets["fatty.zillabyte.com"]
+
       partitions_for_thread = @partitions_on_localhost.select.with_index{|_,i| i % num_threads == thread_num}
 
       log "Partitions for thread ##{thread_num}: #{partitions_for_thread}"
+      shard_num = 0
       while f = work_q.pop(true)
         per_shard_time = Time.now
         path = "/tmp/" + f.split("/").last(2).join("_")
-        File.open(path, 'wb') do |file|
-          bucket.objects[f].read do |chunk|
-            begin
-              file.write(chunk)
-            rescue
-              log "s3 error for path: #{f}"
+
+        begin
+
+          File.open(path, 'wb') do |file|
+            _bucket.objects[f].read do |chunk|
+              begin
+                file.write(chunk)
+              rescue
+                log "s3 error for path: #{f}"
+              end
             end
           end
+        rescue Exception => e
+          log "Failed shard. Moving on: #{f}"
+          next
         end
-        
         partition = partitions_for_thread.sample
         producer = get_producer_for_partition(partition)
 
@@ -226,12 +245,12 @@ num_threads.times do |thread_num|
         # Send each shard to an arbitrary partition
         # producer.send_messages(msgs)
         File.delete path
-
-        log( "Partition: #{partition} : #{Time.now - per_shard_time}s -  #{sent_messages} msgs. #{path}  remaining: #{work_q.size}.  Since: #{Time.now - start_time}") 
+        shard_num += 1
+        log( "#T: #{thread_num} P#: #{partition}\t #{(Time.now - per_shard_time).round(2)}s \t#{num_msgs_per_thread} msgs. #{path.gsub("/tmp/", "")} \tshard: #{} \tRem:#{work_q.size}.  since: #{((Time.now - start_time) / 60.0).round(2)} min") 
       end
     rescue SystemExit, Interrupt, Exception => te
       log "Thread Completed: #{te.message}.\n\n\tTotal Messages for this thread: #{num_msgs_per_thread}\n\n"
-      puts te.backtrace
+      puts te.backtrace unless te.message.include?("queue empty")
       Thread.exit
     end
   end

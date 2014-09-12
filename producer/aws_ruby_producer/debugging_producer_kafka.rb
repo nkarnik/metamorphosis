@@ -28,7 +28,7 @@ opt_parser = OptionParser.new do |opt|
   opt.separator  ""
   opt.separator  "Options:"
      
-  opt.on("--shards SHARDS",Integer, "Number of shards to download") do |shards|
+  opt.on("--shards SHARDS",Integer, "Optional. Number of shards to download. Default: All") do |shards|
     $options[:num_shards] = shards
   end
 
@@ -36,16 +36,21 @@ opt_parser = OptionParser.new do |opt|
     $options[:broker_id] = broker.to_i
   end
   
-  opt.on("--threads THREADS",Integer, "Number of threads") do |threads|
+  opt.on("--threads THREADS",Integer, "Number of threads. Default: 1") do |threads|
     $options[:threads] = threads
   end
 
-  opt.on("--env ENV", String, "Env? prod,test,local") do |env|
+  opt.on("--env ENV", String, "Required. Env? prod,test,local") do |env|
     $options[:env] = env
   end
   
-  opt.on("--topic TOPIC", String, "Set the AMI to use") do |topic|
+  opt.on("--topic TOPIC", String, "Required. Set the Topic to use") do |topic|
     $options[:topic] = topic
+  end
+  
+  opt.on("-h","--help","help") do
+    puts opt_parser
+    exit
   end
 end
 
@@ -54,10 +59,16 @@ opt_parser.parse!
 #Multithreaded
 work_q = Queue.new
 
-num_shards    = $options[:num_shards].to_i
+num_shards    = $options[:num_shards].to_i || 0
 env           = $options[:env] || "prod"
-topic         = $options[:topic] || "s4"
-num_threads   = $options[:threads].to_i || "5"
+
+if $options[:topic].nil?
+  puts opt_parser
+  exit
+end
+
+topic         = $options[:topic] 
+num_threads   = $options[:threads].to_i || "1"
 
 puts "Options: #{$options}"
 
@@ -79,9 +90,6 @@ else
 end
 
 puts "fqdns: #{fqdns}"
-
-
-
 
 
 ## Manifest distribution
@@ -106,7 +114,7 @@ line_num = 1
 if $options[:broker_id]
   File.open(local_manifest) do |file|
     file.each_line do |line|
-      break if work_q.size == num_shards
+      # break if work_q.size == num_shards
       if line_num % fqdns.size == $options[:broker_id]
         work_q << line.chomp.gsub("s3://fatty.zillabyte.com/", "") # Only need path
       end
@@ -119,11 +127,12 @@ log "Manifest distributed, in queue: #{work_q.size}"
 # binding.pry
 return if work_q.size == 0
 
+
+## Get Cluster metadata for topic
 seed_brokers = fqdns
 broker_pool = Poseidon::BrokerPool.new("fetch_metadata_client", seed_brokers)
 cluster_metadata = Poseidon::ClusterMetadata.new
 cluster_metadata.update(broker_pool.fetch_metadata([topic]))
-
 metadata = cluster_metadata.topic_metadata[topic]
 num_partitions = metadata.partition_count
 @leaders_per_partition = []
@@ -165,11 +174,16 @@ workers = []
 num_threads.times do |thread_num|
   
   t = Thread.new do
+    num_msgs_per_thread = 0
     begin
       # We want producers exclusive to threads. 
       # producers_for_thread = @producers.select.with_index{|_,i| i % num_threads == thread_num}
       # log "producer: #{producer} for node: #{producer_fqdn}"
-      num = 0
+
+
+      partitions_for_thread = @partitions_on_localhost.select.with_index{|_,i| i % num_threads == thread_num}
+
+      log "Partitions for thread ##{thread_num}: #{partitions_for_thread}"
       while f = work_q.pop(true)
         per_shard_time = Time.now
         path = "/tmp/" + f.split("/").last(2).join("_")
@@ -182,45 +196,43 @@ num_threads.times do |thread_num|
             end
           end
         end
-
-        partition = @partitions_on_localhost.sample
-        producer = @producer_hash[partition]
+        
+        partition = partitions_for_thread.sample
+        producer = get_producer_for_partition(partition)
 
         s3file = open(path)
-        log "Downloaded: #{path} in #{Time.now - per_shard_time}"
+        # log "Downloaded: #{path} in #{Time.now - per_shard_time}"
         gz = Zlib::GzipReader.new(s3file)
         msgs = []
         sent_messages = 0
-        batch_size = 100
+        batch_size = 1000
         gz.each_line do |line|
           begin
-            msgs << Poseidon::MessageToSend.new(topic, "#{num}"+line[0..1000])
-            num += 1
-            if(msgs.size == batch_size)
-              unless producer.send_messages(msgs)
-                log "Message failed: Line length #{line.size}"
-              end
-              sent_messages += batch_size
-              msgs = []
-            end
+            msgs << Poseidon::MessageToSend.new(topic, line)
             # producer.send_messages([Poseidon::MessageToSend.new(topic, line)])
             # binding.pry
           rescue Exception => e
             log "Error: #{e.message}"
           end
         end 
+        if producer.send_messages(msgs)
+          sent_messages += msgs.size
+          num_msgs_per_thread += sent_messages
+        else
+          log "Message failed: Batch size #{msgs.size} Sent from this shard: #{sent_messages}"
+        end
 
         # binding.pry
         # Send each shard to an arbitrary partition
         # producer.send_messages(msgs)
         File.delete path
 
-        log( "Partition: #{partition} took: #{Time.now - per_shard_time} seconds for #{sent_messages} msgs. #{path} shards remaing: #{work_q.size}.  Since start: #{Time.now - start_time}")
-        
-            
+        log( "Partition: #{partition} : #{Time.now - per_shard_time}s -  #{sent_messages} msgs. #{path}  remaining: #{work_q.size}.  Since: #{Time.now - start_time}") 
       end
-    rescue ThreadError => te
-      log "Thread Errored: #{te.message}"
+    rescue SystemExit, Interrupt, Exception => te
+      log "Thread Completed: #{te.message}.\n\n\tTotal Messages for this thread: #{num_msgs_per_thread}\n\n"
+      puts te.backtrace
+      Thread.exit
     end
   end
   workers << t

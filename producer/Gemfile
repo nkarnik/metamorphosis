@@ -1,4 +1,0 @@
-source 'https://rubygems.org'
-
-gem 'poseidon'
-gem 'aws-sdk'

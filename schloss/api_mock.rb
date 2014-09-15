@@ -23,10 +23,15 @@ opt_parser = OptionParser.new do |opt|
   opt.on("--env ENV", String, "Required. Env? prod,test,local") do |env|
     $options[:env] = env
   end
+
+  opt.on("--topic TOPIC", String, "Required. Topic? prod,test,local") do |topic|
+    $options[:topic] = topic
+  end
 end
 
 opt_parser.parse!
 env = $options[:env] || "prod"
+topic = $options[:topic] || "mock"
 
 LOGFILE = "kafka_producer.log"
 `touch #{LOGFILE}`
@@ -48,9 +53,12 @@ mockapi = Poseidon::Producer.new(fqdns, "mockapi", :type => :sync)
 while true do
 
   puts "Enter a topic: "
-  topic = gets.chomp()
+  raw = gets.chomp().split(" ")
+  message = {:bucket => raw[0], :manifest => raw[1], :topic => raw[2]}.to_json
+  
+
   messages = []
-  messages << Poseidon::MessageToSend.new("mock", topic)
+  messages << Poseidon::MessageToSend.new(topic, message)
   mockapi.send_messages(messages)
   
 end

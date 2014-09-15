@@ -44,7 +44,7 @@ LOGFILE = "kafka_consumer.log"
 
 def find_broker(env, attrib = 'fqdn')
   results = `knife search node "role:kafka_broker AND chef_environment:#{env}" -F json -a fqdn  -c ~/zb1/infrastructure/chef/.chef/knife.rb`
-  return JSON.parse(results)["rows"].map{ |a| a.map{|k,v| v["fqdn"]}  }
+  return JSON.parse(results)["rows"].map{ |a| a.map{|k,v| v["fqdn"]}  }.map{|v| "#{v[0]}:9092"}
 end
 
 if env == "local"
@@ -55,14 +55,22 @@ end
 
 puts "fqdns: #{fqdns}"
 consumers = []
+producers = []
+
+mockwriter = Poseidon::Producer.new(fqdns, "mockwriter", :type => :sync)
+
 con = 0
 fqdns.each do |host|
-  host = host[0]
+  consumer_host = host.split(":")[0]
+  puts host
   begin
-    consumer = Poseidon::PartitionConsumer.new("con_#{con}", host, 9092, topic, 0, :earliest_offset)
+    #producer = Poseidon::Producer.new([host],"con_test#{host}", :type => :sync)
+    #producers << producer
+
+    consumer = Poseidon::PartitionConsumer.new("con_#{con}", consumer_host, 9092, topic, 0, :earliest_offset)
     consumers << consumer 
   rescue
-    puts "error"
+    #puts "error"
   end
   con += 1
 end
@@ -74,12 +82,16 @@ loop do
     #puts consumer, consumer.host
     begin
       messages = consumer.fetch({:max_bytes => 100000})
-      #puts messages
+      #puts messages 
       messages.each do |m|
-        message = m.value.split()
+        message = m.value
         log m.value
-        bucket_name = message[0]
-        manifest_path = message[1]
+        message = JSON.parse(message)
+        log message
+        bucket_name = message["bucket"]
+        manifest_path = message["manifest"]
+        topic_to_write = message["topic"]
+        puts bucket_name, manifest_path
         bucket = s3.buckets[bucket_name]
         log "Downloading Manifest"
 
@@ -93,13 +105,32 @@ loop do
           end
         end
 
+        hosts = fqdns.length
+        round_robin = 0
         File.open(local_manifest).each do |line|
-          log line
+          info = line + " " + topic_to_write.to_s + " " + bucket_name
+          info = {:bucket => bucket_name, :shard => line, :topic => topic_to_write}.to_json
+          log info
+          hostnum = round_robin % hosts
+          puts fqdns[hostnum]
+          
+          broker_topic = fqdns[hostnum].to_s + "test1"
+          broker_topic = broker_topic.split(":")[0] + "test1"
+          puts broker_topic
+          puts mockwriter
+          msgs = []
+          #msgs << Poseidon::MessageToSend.new(broker_topic, line)
+          msgs << Poseidon::MessageToSend.new(broker_topic, info)
+          puts msgs
+          mockwriter.send_messages(msgs)
+          puts "sent"
+
+          round_robin += 1
         end 
 
       end
     rescue
-      puts "error"
+      #puts "error"
     end
   end
 end

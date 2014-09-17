@@ -35,7 +35,7 @@ opt_parser = OptionParser.new do |opt|
   end
 
   opt.on("--topic TOPIC", String, "Required. Topic? prod,test,local") do |topic|
-    $options[:opictopic] = topic
+    $options[:topic] = topic
   end
 
   opt.on("--threads THREADS",Integer, "Number of threads. Default: 1") do |threads|

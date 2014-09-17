@@ -48,19 +48,66 @@ opt_parser = OptionParser.new do |opt|
 
 end
 
+#Parse and set options
 opt_parser.parse!
 env = $options[:env] || "prod"
+
+# $topic global is just for debugging
 $topic = $options[:topic] || "some_homepages"
+
 num_threads = $options[:threads].to_i || "1"
 num_shards = $options[:num_shards].to_i || "10"
 $bucket_name = "fatty.zillabyte.com"
 
-topic_producer_hash = {}
 work_q = Queue.new
 
 LOGFILE = "queue_consumer.log"
 `touch #{LOGFILE}`
 
+#Class that houses configuration information for building producers for each thread
+class TopicProducer
+  attr_reader :leaders_per_partition, :partitions_on_localhost, :producer_hash
+  def initialize(broker_pool, topic)
+    cluster_metadata = Poseidon::ClusterMetadata.new
+    cluster_metadata.update(broker_pool.fetch_metadata([topic]))
+    metadata = cluster_metadata.topic_metadata[topic]
+    num_partitions = metadata.partition_count
+
+    @leaders_per_partition = []
+    metadata.partition_count.times do |part_num|
+      @leaders_per_partition << cluster_metadata.lead_broker_for_partition(topic, part_num).host
+    end
+
+    # log "Leaders per partition: #{leaders_per_partition}"
+    partitions_per_leader = {}
+    @leaders_per_partition.each_with_index do |ip, index|
+      if partitions_per_leader[ip].nil?
+        partitions_per_leader[ip] = []
+      end
+      partitions_per_leader[ip] << index
+    end
+    
+    this_host = `hostname`.chomp() + ".ec2.internal"
+    @partitions_on_localhost = partitions_per_leader[this_host] || []
+    #log "Partitions on this host: #{@partitions_on_localhost.size}" 
+
+    @producer_hash = Hash.new {|hash, partition| hash[partition] = get_producer_for_partition(partition)}
+  end
+
+  def get_producer_for_partition(partition_num)
+    single_partitioner = Proc.new { |key, partition_count| partition_num  } # Will always right to a single partition
+    producer_fqdn = @leaders_per_partition[partition_num]
+    return Poseidon::Producer.new([producer_fqdn.split(".").first.gsub("ip-", "").gsub("-",".") + ":9092"],
+                                  "producer_#{partition_num}",
+                                  :type => :sync,
+                                  :partitioner => single_partitioner,
+                                  # :snappy Unimplemented in Poseidon. Should be easy to add into
+                                  # https://github.com/bpot/poseidon/blob/master/lib/poseidon/compression/snappy_codec.rb
+                                  :compression_codec => :gzip)
+  end
+end
+
+#pass in env (test/prod) and get fqdns of all kafka brokers
 def find_broker(env, attrib = 'fqdn')
   results = `knife search node "role:kafka_broker AND chef_environment:#{env}" -F json -a fqdn  -c ~/zb1/infrastructure/chef/.chef/knife.rb`
   return JSON.parse(results)["rows"].map{ |a| a.map{|k,v| v["fqdn"]}  }.map{|v| "#{v[0]}:9092"}
@@ -76,20 +123,19 @@ puts "fqdns: #{fqdns}"
 consumers = []
 producers = []
 
-mockwriter = Poseidon::Producer.new(fqdns, "mockwriter", :type => :sync)
+$topic_producer_hash = {}
+seed_brokers = fqdns
+$broker_pool = Poseidon::BrokerPool.new("fetch_metadata_client", seed_brokers)
 
+#Create array of consumers to read from dedicated kafka worker queue for this broker
 con = 0
 fqdns.each do |host|
   consumer_host = host.split(":")[0]
-  puts host
   begin
-    #producer = Poseidon::Producer.new([host],"con_test#{host}", :type => :sync)
-    #producers << producer
-
     consumer = Poseidon::PartitionConsumer.new("con_#{con}", consumer_host, 9092, queue_name, 0, :earliest_offset)
     consumers << consumer
   rescue
-    puts "error"
+    log "Error: couldn't create Consumer"
   end
   con += 1
 end
@@ -97,23 +143,26 @@ end
 def read_from_queue(cons, worker_q)
   loop do
     cons.each do |consumer|
-      #puts consumer, consumer.host
+      #Fetch messages from dedicated worker queue, push message to work_q 
       begin
-        messages = consumer.fetch({:max_bytes => 100000})
-        #puts messages
+        messages = consumer.fetch({:max_bytes => 100000}) 
         messages.each do |m|
           message = m.value
-          #log m.value
-          message = JSON.parse(message)
           #log message
-          $bucket_name = message["bucket"]
-          shard_path = message["shard"]
-          $topic = message["topic"]
-          #log(bucket_name + " " + shard_path + " " + topic)
-          relative_path = shard_path.chomp.gsub("s3://fatty.zillabyte.com/", "")
-          #log relative_path
+          message = JSON.parse(message)
+  
+          topic = message["topic"]          
           worker_q << message
           #log worker_q.size
+          
+          # build TopicProducer configuration object for topic 
+          if not $topic_producer_hash.has_key?(topic)
+            log "Creating new producer for #{topic}"
+            topicproducer = TopicProducer.new($broker_pool, topic) 
+            $topic_producer_hash[topic] = topicproducer 
+            a = topicproducer.partitions_on_localhost
+            #log "Finished creating producer for #{topic}"
+          end
         end
       rescue
         #puts "error"
@@ -125,52 +174,8 @@ end
 q_thread = Thread.new{read_from_queue(consumers, work_q)}
 #q_thread.join
 
-sleep 10
-puts $topic
+sleep 5
 
-## Get Cluster metadata for topic
-seed_brokers = fqdns
-broker_pool = Poseidon::BrokerPool.new("fetch_metadata_client", seed_brokers)
-cluster_metadata = Poseidon::ClusterMetadata.new
-cluster_metadata.update(broker_pool.fetch_metadata([$topic]))
-metadata = cluster_metadata.topic_metadata[$topic]
-num_partitions = metadata.partition_count
-@leaders_per_partition = []
-metadata.partition_count.times do |part_num|
-  @leaders_per_partition << cluster_metadata.lead_broker_for_partition($topic, part_num).host
-end
-
-# log "Leaders per partition: #{leaders_per_partition}"
-partitions_per_leader = {}
-@leaders_per_partition.each_with_index do |ip, index|
-  if partitions_per_leader[ip].nil?
-    partitions_per_leader[ip] = []
-  end
-  partitions_per_leader[ip] << index
-end
-
-this_host = `hostname`.chomp() + ".ec2.internal"
-@partitions_on_localhost = partitions_per_leader[this_host] || []
-log "Partitions on this host: #{@partitions_on_localhost.size}"
-# log @partitions_per_leader
-
-def get_producer_for_partition(partition_num)
-  single_partitioner = Proc.new { |key, partition_count| partition_num  } # Will always right to a single partition
-  producer_fqdn = @leaders_per_partition[partition_num]
-  return Poseidon::Producer.new([producer_fqdn.split(".").first.gsub("ip-", "").gsub("-",".") + ":9092"],
-                                "producer_#{partition_num}",
-                                :type => :sync,
-                                :partitioner => single_partitioner,
-                                # :snappy Unimplemented in Poseidon. Should be easy to add into
-                                # https://github.com/bpot/poseidon/blob/master/lib/poseidon/compression/snappy_codec.rb
-                                :compression_codec => :gzip)
-end
-
-# @producers = @partitions_on_localhost.map{|partition| get_producer_for_partition(partition)}
-@producer_hash = Hash.new {|hash, partition| hash[partition] = get_producer_for_partition(partition)}
-
-# log @producers
-# log "#{@producers.size} producers created"
 # binding.pry
 
 start_time = Time.now
@@ -185,20 +190,23 @@ num_threads.times do |thread_num|
       # We want producers exclusive to threads.
       # producers_for_thread = @producers.select.with_index{|_,i| i % num_threads == thread_num}
       # log "producer: #{producer} for node: #{producer_fqdn}"
-      log work_q.size
-
-      _s3 = AWS::S3.new
-      # Bucket per thread
-      _bucket = _s3.buckets[$bucket_name]
-
-      partitions_for_thread = @partitions_on_localhost.select.with_index{|_,i| i % num_threads == thread_num}
-
-      log "Partitions for thread ##{thread_num}: #{partitions_for_thread}"
-      shard_num = 0
+      log "Number of shards left to push into kafka: " + work_q.size.to_s
+ 
       while s = work_q.pop(true)
+        _s3 = AWS::S3.new
+        # Bucket per thread
+        _bucket = _s3.buckets[s["bucket"]]
+        _topic = s["topic"]
+
+        topicproducer = $topic_producer_hash[_topic]      
+        partitions_for_thread = topicproducer.partitions_on_localhost.select.with_index{|_,i| i % num_threads == thread_num}
+
+        shard_num = 0
+
         f = s["shard"].chomp.gsub("s3://fatty.zillabyte.com/", "")
         topic = s["topic"]
-        log f
+        log "Preparing shard: " + f
+        
         per_shard_time = Time.now
         path = "/tmp/" + f.split("/").last(2).join("_")
 
@@ -218,7 +226,7 @@ num_threads.times do |thread_num|
           next
         end
         partition = partitions_for_thread.sample
-        producer = get_producer_for_partition(partition)
+        producer = topicproducer.get_producer_for_partition(partition)
 
         s3file = open(path)
         # log "Downloaded: #{path} in #{Time.now - per_shard_time}"

@@ -1,9 +1,10 @@
-require "json"
+require 'json'
 require 'thread'
-require "aws-sdk"
-require "poseidon"
-require "optparse"
+require 'aws-sdk'
+require 'poseidon'
+require 'optparse'
 require 'pry'
+require './TopicProducerConfig'
 
 def log(msg)
   if @lf.nil?
@@ -158,7 +159,7 @@ def read_from_queue(cons, worker_q)
           # build TopicProducer configuration object for topic 
           if not $topic_producer_hash.has_key?(topic)
             log "Creating new producer for #{topic}"
-            topicproducer = TopicProducer.new($broker_pool, topic) 
+            topicproducer = TopicProducerConfig.new($broker_pool, topic) 
             $topic_producer_hash[topic] = topicproducer 
             a = topicproducer.partitions_on_localhost
             #log "Finished creating producer for #{topic}"

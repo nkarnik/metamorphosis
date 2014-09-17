@@ -186,16 +186,16 @@ num_threads.times do |thread_num|
       # producers_for_thread = @producers.select.with_index{|_,i| i % num_threads == thread_num}
       # log "producer: #{producer} for node: #{producer_fqdn}"
       log work_q.size
-
-      _s3 = AWS::S3.new
-      # Bucket per thread
-      _bucket = _s3.buckets[$bucket_name]
-
-      partitions_for_thread = @partitions_on_localhost.select.with_index{|_,i| i % num_threads == thread_num}
-
-      log "Partitions for thread ##{thread_num}: #{partitions_for_thread}"
-      shard_num = 0
+ 
       while s = work_q.pop(true)
+        _s3 = AWS::S3.new
+        # Bucket per thread
+        _bucket = _s3.buckets[s["bucket"]]
+
+        partitions_for_thread = @partitions_on_localhost.select.with_index{|_,i| i % num_threads == thread_num}
+        log "Partitions for thread ##{thread_num}: #{partitions_for_thread}"
+        shard_num = 0
+
         f = s["shard"].chomp.gsub("s3://fatty.zillabyte.com/", "")
         topic = s["topic"]
         log f

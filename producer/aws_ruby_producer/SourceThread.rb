@@ -44,6 +44,8 @@ class ProducerThread
         while s = work_q.pop(true)
           @sourcetype = s["sourcetype"]
           @sourceconfig = s["sourceconfig"]
+          log @sourceconfig
+          log @sourcetype
           @source = createSource()
           @topic = s["topic"]
 

@@ -23,7 +23,7 @@ AWS.config(
 
 
 host = `hostname`.chomp
-queue_name =  "#{host}.ec2.internaltest2"
+queue_name =  "#{host}.ec2.internaltest3"
 puts queue_name
 
 $options = {}
@@ -112,8 +112,8 @@ def read_from_queue(cons, worker_q)
 
           topic = message["topic"]
           worker_q << message
-          log worker_q.size
-
+          #log worker_q.size
+          #log topic
           # build TopicProducer configuration object for topic
           if not $topic_producer_hash.has_key?(topic)
             log "Creating new producer for #{topic}"
@@ -130,7 +130,7 @@ def read_from_queue(cons, worker_q)
   end
 end
 
-q_thread = Thread.new{read_from_queue(consumers, work_q)}
+q_thread = Thread.new{read_from_queue(consumers, $work_q)}
 #q_thread.join
 
 sleep 5
@@ -144,7 +144,7 @@ puts "Start time: #{start_time}"
 workers = []
 num_threads.times do |thread_num|
 
-  t = ProducerThread.new(LOGFILE)
+  t = ProducerThread.new(LOGFILE, num_threads, thread_num, start_time)
   t.start($work_q, $topic_producer_hash)
   workers << t.thread
 

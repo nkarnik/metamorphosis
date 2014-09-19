@@ -6,13 +6,16 @@ require './TopicProducerConfig'
 
 class ProducerThread
   attr_reader :thread, :sourcetype, :sourceconfig, :source, :topic
-  def initialize(logfile)
+  def initialize(logfile, num_threads, thread_num, start_time)
+    @start_time = start_time
     @sourcetype = nil
     @sourceconfig = nil
     @source = nil
     @topic = nil
     @thread = nil
-    @logfile = LOGFILE
+    @logfile = logfile
+    @num_threads = num_threads
+    @thread_num = thread_num
 
   end
 
@@ -44,16 +47,21 @@ class ProducerThread
         while s = work_q.pop(true)
           @sourcetype = s["sourcetype"]
           @sourceconfig = s["sourceconfig"]
+          log @sourceconfig
+          #log @sourceconfig.class
+          log @sourcetype
           @source = createSource()
           @topic = s["topic"]
+          log @topic
 
           topicproducer = topic_producer_hash[@topic]
-          partitions_for_thread = topicproducer.partitions_on_localhost.select.with_index{|_,i| i % num_threads == thread_num}
+          partitions_for_thread = topicproducer.partitions_on_localhost.select.with_index{|_,i| i % @num_threads == @thread_num}
 
           #Get path of file where data is written to locally, and write data there
-          #If the d
+          #If the data doesn't write then exit
+          per_shard_time = Time.now
           path = @source.path
-
+                
           begin
             @source.getData()
           rescue Exception => e
@@ -92,8 +100,8 @@ class ProducerThread
           # Send each shard to an arbitrary partition
           # producer.send_messages(msgs)
           File.delete path
-          shard_num += 1
-          log( "#T: #{thread_num} P#: #{partition}\t #{(Time.now - per_shard_time).round(2)}s \t#{num_msgs_per_thread} msgs. #{path.gsub("/tmp/", "")} \tshard: #{} \tRem:#{work_q.size}.  since: #{((Time.now - start_time) / 60.0).round(2)} min")
+          #shard_num += 1
+          log( "#T: #{@thread_num} P#: #{partition}\t #{(Time.now - per_shard_time).round(2)}s \t#{num_msgs_per_thread} msgs. #{path.gsub("/tmp/", "")} \tshard: #{} \tRem:#{work_q.size}.  since: #{((Time.now - @start_time) / 60.0).round(2)} min")
         end
       rescue SystemExit, Interrupt, Exception => te
         log "Thread Completed: #{te.message}.\n\n\tTotal Messages for this thread: #{num_msgs_per_thread}\n\n"
@@ -142,20 +150,21 @@ class S3Source < KafkaSource
     @_s3 = AWS::S3.new
     @_bucket = @_s3.buckets[sourceconfig["bucket"]]
 
-    f = sourceconfig["shard"].chomp.gsub("s3://#{sourceconfig["bucket"]}/", "")
-    log "Preparing shard"
+    @f = sourceconfig["shard"].chomp.gsub("s3://#{sourceconfig["bucket"]}/", "")
+    log "Preparing shard #{@f}"
     per_shard_time = Time.now
-    @path = "/tmp/" + f.split("/").last(2).join("_")
-
+    @path = "/tmp/" + @f.split("/").last(2).join("_")
+    log @path
   end
 
   def getData()
+    log "getting data"
 
     begin
-
+      log "opening path: " + @path
       File.open(@path, 'wb') do |file|
-        @_bucket.objects[f].read do |chunk|
-          begin
+        @_bucket.objects[@f].read do |chunk|
+          begin 
             file.write(chunk)
           rescue
             log "s3 error for path: #{f}"

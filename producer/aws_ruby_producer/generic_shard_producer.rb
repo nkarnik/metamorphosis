@@ -107,12 +107,12 @@ def read_from_queue(cons, worker_q)
         messages = consumer.fetch({:max_bytes => 100000})
         messages.each do |m|
           message = m.value
-          #log message
+          log message
           message = JSON.parse(message)
 
           topic = message["topic"]
           worker_q << message
-          #log worker_q.size
+          log worker_q.size
 
           # build TopicProducer configuration object for topic
           if not $topic_producer_hash.has_key?(topic)
@@ -120,7 +120,7 @@ def read_from_queue(cons, worker_q)
             topicproducer = TopicProducerConfig.new($broker_pool, topic)
             $topic_producer_hash[topic] = topicproducer
             a = topicproducer.partitions_on_localhost
-            #log "Finished creating producer for #{topic}"
+            log "Finished creating producer for #{topic}"
           end
         end
       rescue
@@ -144,7 +144,7 @@ puts "Start time: #{start_time}"
 workers = []
 num_threads.times do |thread_num|
 
-  t = SourceThread::ProducerThread.new
+  t = ProducerThread.new(LOGFILE)
   t.start($work_q, $topic_producer_hash)
   workers << t.thread
 

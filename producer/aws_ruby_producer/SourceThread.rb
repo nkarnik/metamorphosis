@@ -107,7 +107,7 @@ class KafkaSource
 
   def log(msg)
     if @lf.nil?
-      @lf = File.open($logfile, 'a')
+      @lf = File.open(@logfile, 'a')
     end
     puts "#{Time.now}: #{msg}\n"
     @lf.write "#{Time.now}: #{msg}\n"
@@ -134,7 +134,7 @@ class S3Source < KafkaSource
     @_bucket = @_s3.buckets[sourceconfig["bucket"]]
 
     f = sourceconfig["shard"].chomp.gsub("s3://#{sourceconfig["bucket"]}/", "")
-    #log "Preparing shard"
+    log "Preparing shard"
     per_shard_time = Time.now
     @path = "/tmp/" + f.split("/").last(2).join("_")
 

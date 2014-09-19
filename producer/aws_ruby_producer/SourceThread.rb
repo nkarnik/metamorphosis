@@ -30,6 +30,7 @@ class ProducerThread
       source = S3Source.new(@sourceconfig, @logfile)
       return source
     end
+  end
 
   def start(work_q, topic_producer_hash)
     @thread = Thread.new do
@@ -49,9 +50,16 @@ class ProducerThread
           topicproducer = topic_producer_hash[@topic]
           partitions_for_thread = topicproducer.partitions_on_localhost.select.with_index{|_,i| i % num_threads == thread_num}
 
-          #Get path of file where data is written to locally, and write data there...
+          #Get path of file where data is written to locally, and write data there
+          #If the d
           path = @source.path
-          @source.getData()
+
+          begin
+            @source.getData()
+          rescue Exception => e
+            log "Failed data read. Moving on: #{path}"
+            next
+          end
 
 
           #Select partition by sampling
@@ -156,8 +164,6 @@ class S3Source < KafkaSource
       end
     rescue Exception => e
       log "Failed shard. Moving on: #{f}"
-      next
     end
-
   end
 end

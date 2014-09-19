@@ -23,7 +23,7 @@ AWS.config(
 
 
 host = `hostname`.chomp
-queue_name =  "#{host}.ec2.internaltest3"
+queue_name =  "#{host}.ec2.internaltest5"
 puts queue_name
 
 $options = {}

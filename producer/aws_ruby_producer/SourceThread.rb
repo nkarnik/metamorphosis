@@ -45,8 +45,8 @@ class ProducerThread
         log "Number of shards left to push into kafka: " + work_q.size.to_s
 
         while s = work_q.pop(true)
-          @sourcetype = s["sourcetype"]
-          @sourceconfig = s["sourceconfig"]
+          @sourcetype = s["source"]["type"]
+          @sourceconfig = s["source"]["config"]
           log @sourceconfig
           #log @sourceconfig.class
           log @sourcetype

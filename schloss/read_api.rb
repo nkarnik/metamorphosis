@@ -29,7 +29,7 @@ opt_parser = OptionParser.new do |opt|
   opt.on("--env ENV", String, "Required. Env? prod,test,local") do |env|
     $options[:env] = env
   end
-  
+
   opt.on("--topic TOPIC", String, "Required. Topic? prod,test,local") do |topic|
     $options[:topic] = topic
   end
@@ -68,7 +68,7 @@ fqdns.each do |host|
     #producers << producer
 
     consumer = Poseidon::PartitionConsumer.new("con_#{con}", consumer_host, 9092, topic, 0, :earliest_offset)
-    consumers << consumer 
+    consumers << consumer
   rescue
     #puts "error"
   end
@@ -82,15 +82,16 @@ loop do
     #puts consumer, consumer.host
     begin
       messages = consumer.fetch({:max_bytes => 100000})
-      #puts messages 
+      #puts messages
       messages.each do |m|
         message = m.value
         log m.value
         message = JSON.parse(message)
         log message
-        bucket_name = message["bucket"]
-        manifest_path = message["manifest"]
+        bucket_name = message["sourceconfig"]["bucket"]
+        manifest_path = message["soureconfig"]["manifest"]
         topic_to_write = message["topic"]
+        sourcetype = message["sourcetype"]
         puts bucket_name, manifest_path
         bucket = s3.buckets[bucket_name]
         log "Downloading Manifest"
@@ -109,13 +110,14 @@ loop do
         round_robin = 0
         File.open(local_manifest).each do |line|
           info = line + " " + topic_to_write.to_s + " " + bucket_name
-          info = {:bucket => bucket_name, :shard => line, :topic => topic_to_write}.to_json
+          config = {:bucket => bucket_name, :shard => line}
+          info = {:soureconfig => config, :sourcetype => sourcetype, :topic => topic_to_write}.to_json
           log info
           hostnum = round_robin % hosts
           puts fqdns[hostnum]
-          
-          broker_topic = fqdns[hostnum].to_s + "test1"
-          broker_topic = broker_topic.split(":")[0] + "test1"
+
+          broker_topic = fqdns[hostnum].to_s + "test2"
+          broker_topic = broker_topic.split(":")[0] + "test2"
           puts broker_topic
           puts mockwriter
           msgs = []
@@ -126,7 +128,7 @@ loop do
           puts "sent"
 
           round_robin += 1
-        end 
+        end
 
       end
     rescue
@@ -134,5 +136,3 @@ loop do
     end
   end
 end
-
-

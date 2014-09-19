@@ -27,7 +27,7 @@ class ProducerThread
 
   def createSource()
     if @sourcetype == "s3"
-      source = S3Source.new(@sourceconfig)
+      source = S3Source.new(@sourceconfig, @logfile)
       return source
     end
 
@@ -107,7 +107,7 @@ class KafkaSource
 
   def log(msg)
     if @lf.nil?
-      @lf = File.open(LOGFILE, 'a')
+      @lf = File.open($logfile, 'a')
     end
     puts "#{Time.now}: #{msg}\n"
     @lf.write "#{Time.now}: #{msg}\n"

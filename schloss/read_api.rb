@@ -89,7 +89,8 @@ loop do
         message = JSON.parse(message)
         log message
         bucket_name = message["sourceconfig"]["bucket"]
-        manifest_path = message["soureconfig"]["manifest"]
+        manifest_path = message["sourceconfig"]["manifest"]
+        log manifest_path
         topic_to_write = message["topic"]
         sourcetype = message["sourcetype"]
         puts bucket_name, manifest_path
@@ -111,13 +112,13 @@ loop do
         File.open(local_manifest).each do |line|
           info = line + " " + topic_to_write.to_s + " " + bucket_name
           config = {:bucket => bucket_name, :shard => line}
-          info = {:soureconfig => config, :sourcetype => sourcetype, :topic => topic_to_write}.to_json
+          info = {:sourceconfig => config, :sourcetype => sourcetype, :topic => topic_to_write}.to_json
           log info
           hostnum = round_robin % hosts
           puts fqdns[hostnum]
 
-          broker_topic = fqdns[hostnum].to_s + "test2"
-          broker_topic = broker_topic.split(":")[0] + "test2"
+          broker_topic = fqdns[hostnum].to_s + "test4"
+          broker_topic = broker_topic.split(":")[0] + "test4"
           puts broker_topic
           puts mockwriter
           msgs = []

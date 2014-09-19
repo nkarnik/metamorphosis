@@ -6,7 +6,7 @@ require './TopicProducerConfig'
 
 class ProducerThread
   attr_reader :thread, :sourcetype, :sourceconfig, :source, :topic
-  def initialize(LOGFILE)
+  def initialize(logfile)
     @sourcetype = None
     @sourceconfig = None
     @source = None
@@ -98,10 +98,10 @@ end
 
 class KafkaSource
 
-  def initialize(sourceconfig, LOGFILE)
+  def initialize(sourceconfig, logfile)
     #validate input of
 
-    @logfile = LOGFILE
+    @logfile = logfile
 
   end
 
@@ -115,6 +115,7 @@ class KafkaSource
   end
 
   def getData()
+    puts @logfile
     #do some generic stuff
   end
 
@@ -123,13 +124,13 @@ end
 
 class S3Source < KafkaSource
   attr_reader :path
-  def initialize(sourceconfig, LOGFILE)
+  def initialize(sourceconfig, logfile)
     AWS.config(
               :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
               :secret_access_key => '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'
               )
 
-    @logfile = LOGFILE
+    @logfile = logfile
     @_s3 = AWS::S3.new
     @_bucket = @_s3.buckets[sourceconfig["bucket"]]
 

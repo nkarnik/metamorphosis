@@ -7,11 +7,11 @@ require './TopicProducerConfig'
 class ProducerThread
   attr_reader :thread, :sourcetype, :sourceconfig, :source, :topic
   def initialize(logfile)
-    @sourcetype = None
-    @sourceconfig = None
-    @source = None
-    @topic = None
-    @thread = None
+    @sourcetype = nil
+    @sourceconfig = nil
+    @source = nil
+    @topic = nil
+    @thread = nil
     @logfile = LOGFILE
 
   end

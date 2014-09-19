@@ -55,7 +55,8 @@ while true do
   puts "Enter a topic: "
   raw = gets.chomp().split(" ")
   config = {:bucket => raw[2], :manifest => raw[3]}
-  message = {:sourcetype => raw[0], :topic => raw[1], :sourceconfig => config}.to_json
+  source = {:type => raw[0], :config => config}
+  message = {:source => source, :topic => raw[1]}.to_json
 
 
   messages = []

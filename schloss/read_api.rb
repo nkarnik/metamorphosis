@@ -88,11 +88,11 @@ loop do
         log m.value
         message = JSON.parse(message)
         log message
-        bucket_name = message["sourceconfig"]["bucket"]
-        manifest_path = message["sourceconfig"]["manifest"]
+        bucket_name = message["source"]["config"]["bucket"]
+        manifest_path = message["source"]["config"]["manifest"]
         log manifest_path
         topic_to_write = message["topic"]
-        sourcetype = message["sourcetype"]
+        sourcetype = message["source"]["type"]
         puts bucket_name, manifest_path
         bucket = s3.buckets[bucket_name]
         log "Downloading Manifest"
@@ -112,13 +112,14 @@ loop do
         File.open(local_manifest).each do |line|
           info = line + " " + topic_to_write.to_s + " " + bucket_name
           config = {:bucket => bucket_name, :shard => line}
-          info = {:sourceconfig => config, :sourcetype => sourcetype, :topic => topic_to_write}.to_json
+          source = {:type => sourcetype, :config => config}
+          info = {:source => source, :topic => topic_to_write}.to_json
           log info
           hostnum = round_robin % hosts
           puts fqdns[hostnum]
 
-          broker_topic = fqdns[hostnum].to_s + "test4"
-          broker_topic = broker_topic.split(":")[0] + "test4"
+          broker_topic = fqdns[hostnum].to_s + "test5"
+          broker_topic = broker_topic.split(":")[0] + "test5"
           puts broker_topic
           puts mockwriter
           msgs = []

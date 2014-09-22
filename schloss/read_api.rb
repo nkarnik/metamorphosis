@@ -4,7 +4,7 @@ require "aws-sdk"
 require "poseidon"
 require "optparse"
 require 'pry'
-
+require_relative("../common/kafka_utils.rb")
 def log(msg)
   if @lf.nil?
     @lf = File.open(LOGFILE, 'a')
@@ -57,84 +57,78 @@ puts "fqdns: #{fqdns}"
 consumers = []
 producers = []
 
-mockwriter = Poseidon::Producer.new(fqdns, "mockwriter", :type => :sync)
+leaders_per_partition = get_leaders_for_partitions(topic, fqdns)
+
+log "Leaders: #{leaders_per_partition}"
+# Assuming one partition for this topic, find the singular leader
+leader = leaders_per_partition.first
+
+consumer = Poseidon::PartitionConsumer.new("topic_consumer", leader.split(":").first, 9092, topic, 0, :earliest_offset)
+
+shard_writer = Poseidon::Producer.new(fqdns, "mockwriter", :type => :sync)
 
 con = 0
-fqdns.each do |host|
-  consumer_host = host.split(":")[0]
-  puts host
-  begin
-    #producer = Poseidon::Producer.new([host],"con_test#{host}", :type => :sync)
-    #producers << producer
+# fqdns.each do |host|
+#   consumer_host = host.split(":")[0]
+#   puts host
+#   begin
+#     #producer = Poseidon::Producer.new([host],"con_test#{host}", :type => :sync)
+#     #producers << producer
 
-    consumer = Poseidon::PartitionConsumer.new("con_#{con}", consumer_host, 9092, topic, 0, :earliest_offset)
-    consumers << consumer
-  rescue
-    #puts "error"
-  end
-  con += 1
-end
+#     consumer = Poseidon::PartitionConsumer.new("con_#{con}", consumer_host, 9092, topic, 0, :earliest_offset)
+#     consumers << consumer
+#   rescue
+#     #puts "error"
+#   end
+#   con += 1
+# end
 
 local_manifest = "manifest"
 
 loop do
-  consumers.each do |consumer|
-    #puts consumer, consumer.host
-    begin
-      messages = consumer.fetch({:max_bytes => 100000})
-      #puts messages
-      messages.each do |m|
-        message = m.value
-        log m.value
-        message = JSON.parse(message)
-        log message
-        bucket_name = message["source"]["config"]["bucket"]
-        manifest_path = message["source"]["config"]["manifest"]
-        log manifest_path
-        topic_to_write = message["topic"]
-        sourcetype = message["source"]["type"]
-        puts bucket_name, manifest_path
-        bucket = s3.buckets[bucket_name]
-        log "Downloading Manifest"
+  begin
+    messages = consumer.fetch({:max_bytes => 100000}) # Timeout? 
 
-        File.open(local_manifest, 'wb') do |file|
-          bucket.objects[manifest_path].read do |chunk|
-            begin
-              file.write(chunk)
-            rescue
-              log "s3 error for path: #{f}"
-            end
+    messages.each do |m|
+      message = m.value
+      message = JSON.parse(message)
+      bucket_name = message["source"]["config"]["bucket"]
+      manifest_path = message["source"]["config"]["manifest"]
+      topic_to_write = message["topic"]
+      sourcetype = message["source"]["type"]
+      bucket = s3.buckets[bucket_name]
+      log "Downloading Manifest from #{manifest_path} for topic: #{topic_to_write} in bucket: #{bucket_name}"
+      
+      # If source type is s3
+      File.open(local_manifest, 'wb') do |file|
+        bucket.objects[manifest_path].read do |chunk|
+          begin
+            file.write(chunk)
+          rescue
+            log "s3 error for path: #{f}"
           end
         end
-
-        hosts = fqdns.length
-        round_robin = 0
-        File.open(local_manifest).each do |line|
-          info = line + " " + topic_to_write.to_s + " " + bucket_name
-          config = {:bucket => bucket_name, :shard => line}
-          source = {:type => sourcetype, :config => config}
-          info = {:source => source, :topic => topic_to_write}.to_json
-          log info
-          hostnum = round_robin % hosts
-          puts fqdns[hostnum]
-
-          broker_topic = fqdns[hostnum].to_s + "test5"
-          broker_topic = broker_topic.split(":")[0] + "test5"
-          puts broker_topic
-          puts mockwriter
-          msgs = []
-          #msgs << Poseidon::MessageToSend.new(broker_topic, line)
-          msgs << Poseidon::MessageToSend.new(broker_topic, info)
-          puts msgs
-          mockwriter.send_messages(msgs)
-          puts "sent"
-
-          round_robin += 1
-        end
-
       end
-    rescue
-      #puts "error"
+      log "Manifest length: #{`wc -l #{local_manifest}`}"
+      hosts = fqdns.length
+      lines_consumed = 0
+      File.open(local_manifest).each do |line|
+        config = {:bucket => bucket_name, :shard => line}
+        source = {:type => sourcetype, :config => config}
+        info = {:source => source, :topic => topic_to_write}.to_json
+        hostnum = lines_consumed % hosts
+
+        broker_topic = fqdns[hostnum].split(":").first
+        msgs = []
+        msgs << Poseidon::MessageToSend.new(broker_topic, info)
+        shard_writer.send_messages(msgs)
+        
+        lines_consumed += 1
+      end
+      log "Number of shards emitted into #{topic}: #{lines_consumed}"
     end
+  rescue => e
+    log "ERROR: #{e.message}\n#{e.backtrace}"
   end
+
 end

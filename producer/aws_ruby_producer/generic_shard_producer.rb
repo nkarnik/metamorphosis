@@ -6,6 +6,7 @@ require 'optparse'
 require 'pry'
 require './TopicProducerConfig'
 require './SourceThread'
+require_relative "../common/kafka_utils.rb"
 
 def log(msg)
   if @lf.nil?
@@ -23,7 +24,7 @@ AWS.config(
 
 
 host = `hostname`.chomp
-queue_name =  "#{host}.ec2.internaltest5"
+queue_name =  "#{host}.ec2.internal"
 puts queue_name
 
 $options = {}
@@ -67,10 +68,6 @@ LOGFILE = "queue_consumer.log"
 
 
 #pass in env (test/prod) and get fqdns of all kafka brokers
-def find_broker(env, attrib = 'fqdn')
-  results = `knife search node "role:kafka_broker AND chef_environment:#{env}" -F json -a fqdn  -c ~/zb1/infrastructure/chef/.chef/knife.rb`
-  return JSON.parse(results)["rows"].map{ |a| a.map{|k,v| v["fqdn"]}  }.map{|v| "#{v[0]}:9092"}
-end
 
 if env == "local"
   fqdns = ["localhost:9092"]

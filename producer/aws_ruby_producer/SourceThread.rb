@@ -172,7 +172,8 @@ class S3Source < KafkaSource
         end
       end
     rescue Exception => e
-      log "Failed shard. Moving on: #{f}"
+      log "Shard error: #{e.message} for path #{f}"
+      # TODO Retry
     end
   end
 end

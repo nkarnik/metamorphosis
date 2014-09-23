@@ -52,7 +52,7 @@ mockapi = Poseidon::Producer.new(fqdns, "mockapi", :type => :sync)
 
 while true do
 
-  puts "Enter a topic: "
+  puts "Enter a bucket manifest_path topic: "
   raw = gets.chomp().split(" ")
   message = {:bucket => raw[0], :manifest => raw[1], :topic => raw[2]}.to_json
   

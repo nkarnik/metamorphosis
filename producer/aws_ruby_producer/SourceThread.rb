@@ -47,12 +47,9 @@ class ProducerThread
         while s = work_q.pop(true)
           @sourcetype = s["source"]["type"]
           @sourceconfig = s["source"]["config"]
-          log @sourceconfig
-          #log @sourceconfig.class
-          log @sourcetype
           @source = createSource()
           @topic = s["topic"]
-          log @topic
+          log "Source config: #{@sourceconfig}\nSource type: #{@sourcetype}\nTopic: #{@topic}"
 
           topicproducer = topic_producer_hash[@topic]
           partitions_for_thread = topicproducer.partitions_on_localhost.select.with_index{|_,i| i % @num_threads == @thread_num}
@@ -63,12 +60,11 @@ class ProducerThread
           path = @source.path
                 
           begin
-            @source.getData()
+            @source.get_data
           rescue Exception => e
             log "Failed data read. Moving on: #{path}"
             next
           end
-
 
           #Select partition by sampling
           partition = partitions_for_thread.sample
@@ -79,7 +75,6 @@ class ProducerThread
           gz = Zlib::GzipReader.new(datafile)
           msgs = []
           sent_messages = 0
-          batch_size = 1000
           gz.each_line do |line|
             begin
               msgs << Poseidon::MessageToSend.new(@topic, line)
@@ -130,7 +125,7 @@ class KafkaSource
     @lf.flush
   end
 
-  def getData()
+  def get_data
     puts @logfile
     #do some generic stuff
   end
@@ -157,7 +152,7 @@ class S3Source < KafkaSource
     log @path
   end
 
-  def getData()
+  def get_data
     log "getting data"
 
     begin

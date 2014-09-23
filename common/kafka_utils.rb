@@ -10,7 +10,8 @@ def get_leaders_for_partitions(topic, seed_brokers)
   # num_partitions = metadata.partition_count
   leaders_per_partition = []
   metadata.partition_count.times do |part_num|
-    leaders_per_partition << cluster_metadata.lead_broker_for_partition(topic, part_num).host
+    l = cluster_metadata.lead_broker_for_partition(topic, part_num)
+    leaders_per_partition << "#{l.host}:#{l.port}"
   end
   return leaders_per_partition
 end

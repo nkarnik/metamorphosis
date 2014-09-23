@@ -9,10 +9,11 @@ class TopicProducerConfig
 
     @leaders_per_partition = []
     metadata.partition_count.times do |part_num|
-      @leaders_per_partition << cluster_metadata.lead_broker_for_partition(topic, part_num).host
+      h = cluster_metadata.lead_broker_for_partition(topic, part_num)
+      @leaders_per_partition << "#{h.host}:#{h.port}"
     end
 
-    # log "Leaders per partition: #{leaders_per_partition}"
+    log "Leaders per partition: #{leaders_per_partition}"
     partitions_per_leader = {}
     @leaders_per_partition.each_with_index do |ip, index|
       if partitions_per_leader[ip].nil?
@@ -22,8 +23,14 @@ class TopicProducerConfig
     end
     
     this_host = `hostname`.chomp() + ".ec2.internal"
+    
     @partitions_on_localhost = partitions_per_leader[this_host] || []
-    #log "Partitions on this host: #{@partitions_on_localhost.size}" 
+    
+    if(@partitions_on_localhost.size == 0)
+      log "Partitions on localhost is null because no partitions found on #{this_host}. Using sampling instead"
+      @partitions_on_localhost  = partitions_per_leader[partitions_per_leader.keys.sample]
+    end
+    log "Partitions on this host: #{@partitions_on_localhost}" 
 
     @producer_hash = Hash.new {|hash, partition| hash[partition] = get_producer_for_partition(partition)}
   end
@@ -31,7 +38,14 @@ class TopicProducerConfig
   def get_producer_for_partition(partition_num)
     single_partitioner = Proc.new { |key, partition_count| partition_num  } # Will always right to a single partition
     producer_fqdn = @leaders_per_partition[partition_num]
-    return Poseidon::Producer.new([producer_fqdn.split(".").first.gsub("ip-", "").gsub("-",".") + ":9092"],
+    if(producer_fqdn.include? "localhost")
+      producer_connection_string = producer_fqdn
+    else
+      producer_connection_string = producer_fqdn.split(".").first.gsub("ip-", "").gsub("-",".") + ":9092"
+    end
+    log "producer_connection_string for getProducerForPartition: #{producer_connection_string}"
+
+    return Poseidon::Producer.new([producer_connection_string],
                                   "producer_#{partition_num}",
                                   :type => :sync,
                                   :partitioner => single_partitioner,

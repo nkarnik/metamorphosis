@@ -6,6 +6,10 @@ require 'optparse'
 require 'pry'
 require './TopicProducerConfig'
 require './SourceThread'
+require_relative "../../common/kafka_utils.rb"
+
+LOGFILE = "queue_consumer.log"
+`touch #{LOGFILE}`
 
 def log(msg)
   if @lf.nil?
@@ -23,8 +27,6 @@ AWS.config(
 
 
 host = `hostname`.chomp
-queue_name =  "#{host}.ec2.internaltest5"
-puts queue_name
 
 $options = {}
 
@@ -35,8 +37,8 @@ opt_parser = OptionParser.new do |opt|
     $options[:env] = env
   end
 
-  opt.on("--topic TOPIC", String, "Required. Topic? prod,test,local") do |topic|
-    $options[:topic] = topic
+  opt.on("--queue_name QUEUE", String, "Optional, name of the queue to read from. Defaults to host fqdn") do |queue|
+    $options[:queue_name] = queue
   end
 
   opt.on("--threads THREADS",Integer, "Number of threads. Default: 1") do |threads|
@@ -47,33 +49,30 @@ opt_parser = OptionParser.new do |opt|
     $options[:num_shards] = shards
   end
 
+  opt.on("--brokers BROKERS",String, "Optional, for local send in the brokers") do |brokers|
+    $options[:brokers] = brokers
+  end
+
 end
 
 #Parse and set options
 opt_parser.parse!
-env = $options[:env] || "prod"
+env = $options[:env] || "local"
 
-# $topic global is just for debugging
-$topic = $options[:topic] || "some_homepages"
+queue_name = $options[:queue_name] || "#{host}.ec2.internal"
 
 num_threads = $options[:threads].to_i || "1"
 num_shards = $options[:num_shards].to_i || "10"
-$bucket_name = "fatty.zillabyte.com"
+brokers = $options[:brokers] || ["localhost:9092"]
 
 $work_q = Queue.new
 
-LOGFILE = "queue_consumer.log"
-`touch #{LOGFILE}`
 
 
 #pass in env (test/prod) and get fqdns of all kafka brokers
-def find_broker(env, attrib = 'fqdn')
-  results = `knife search node "role:kafka_broker AND chef_environment:#{env}" -F json -a fqdn  -c ~/zb1/infrastructure/chef/.chef/knife.rb`
-  return JSON.parse(results)["rows"].map{ |a| a.map{|k,v| v["fqdn"]}  }.map{|v| "#{v[0]}:9092"}
-end
 
 if env == "local"
-  fqdns = ["localhost:9092"]
+  fqdns = brokers.split(",")
 else
   fqdns = find_broker(env)
 end
@@ -82,60 +81,68 @@ puts "fqdns: #{fqdns}"
 consumers = []
 producers = []
 
+log "Config:\nenv: #{env}\nQueue: #{queue_name}\nThreads: #{num_threads}\nseed brokers: #{fqdns}"
+
 $topic_producer_hash = {}
 seed_brokers = fqdns
 $broker_pool = Poseidon::BrokerPool.new("fetch_metadata_client", seed_brokers)
 
 #Create array of consumers to read from dedicated kafka worker queue for this broker
 con = 0
-fqdns.each do |host|
-  consumer_host = host.split(":")[0]
-  begin
-    consumer = Poseidon::PartitionConsumer.new("con_#{con}", consumer_host, 9092, queue_name, 0, :earliest_offset)
-    consumers << consumer
-  rescue
-    log "Error: couldn't create Consumer"
-  end
-  con += 1
-end
+leaders_per_partition = get_leaders_for_partitions(queue_name, fqdns)
+
+leader = leaders_per_partition.first
+log "Leader: #{leader}"
+
+@consumer = Poseidon::PartitionConsumer.new(queue_name, leader.split(":").first, leader.split(":").last, queue_name, 0, :earliest_offset)
+
+log "Consumer : #{@consumer}"
 
 def read_from_queue(cons, worker_q)
-  loop do
-    cons.each do |consumer|
-      #Fetch messages from dedicated worker queue, push message to work_q
-      begin
-        messages = consumer.fetch({:max_bytes => 100000})
-        messages.each do |m|
-          message = m.value
-          log message
-          message = JSON.parse(message)
+  # loop do
+    log "Starting loop"
+    #Fetch messages from dedicated worker queue, push message to work_q
 
-          topic = message["topic"]
-          worker_q << message
-          #log worker_q.size
-          #log topic
-          # build TopicProducer configuration object for topic
-          if not $topic_producer_hash.has_key?(topic)
-            log "Creating new producer for #{topic}"
-            topicproducer = TopicProducerConfig.new($broker_pool, topic)
-            $topic_producer_hash[topic] = topicproducer
-            a = topicproducer.partitions_on_localhost
-            log "Finished creating producer for #{topic}"
-          end
+    # Assuming one partition for this topic, find the singular leader
+
+    begin
+
+      log "Getting message now... consumer: #{@consumer}"
+      messages = @consumer.fetch({:max_bytes => 100000})
+      log "Got message?"
+      log "Messages received: #{messages}"
+      messages.each do |m|
+        message = m.value
+        log message
+        message = JSON.parse(message)
+        log "Processing message: #{message}"
+
+        topic = message["topic"]
+        worker_q << message
+        #log worker_q.size
+        #log topic
+        # build TopicProducer configuration object for topic
+        if not $topic_producer_hash.has_key?(topic)
+          log "Creating new producer for #{topic}"
+          topicproducer = TopicProducerConfig.new($broker_pool, topic)
+          $topic_producer_hash[topic] = topicproducer
+          a = topicproducer.partitions_on_localhost
+          log "Finished creating producer for #{topic}"
         end
-      rescue
-        #puts "error"
       end
+    rescue Exception => e
+      log "ERROR: #{e.message}"
+      #puts "error"
     end
-  end
+  # end
 end
 
-q_thread = Thread.new{read_from_queue(consumers, $work_q)}
-#q_thread.join
-
-sleep 5
+# q_thread = Thread.new{read_from_queue(consumers, $work_q)}
+# q_thread.join
 
 # binding.pry
+
+read_from_queue(consumers, $work_q)
 
 start_time = Time.now
 puts "Start time: #{start_time}"

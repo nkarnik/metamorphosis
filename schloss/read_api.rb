@@ -89,7 +89,7 @@ shard_writer = Poseidon::Producer.new(fqdns, "mockwriter", :type => :sync)
 con = 0
 
 local_manifest = "manifest"
-unless File.exists? local_manifest
+if File.exists? local_manifest
   File.delete local_manifest
 end
 run_num = 0

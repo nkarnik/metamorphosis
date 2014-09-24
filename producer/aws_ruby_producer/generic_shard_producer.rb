@@ -110,7 +110,7 @@ def read_from_queue(cons, worker_q)
       log "Getting message now... consumer: #{@consumer}"
       messages = @consumer.fetch({:max_bytes => 1000000})
       log "Got message?"
-      log "Messages received: #{messages}"
+      #log "Messages received: #{messages}"
       log "#{messages.length} messages received"
       #sleep 100
       messages.each do |m|

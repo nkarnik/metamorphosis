@@ -2,7 +2,10 @@ require 'thread'
 require 'aws-sdk'
 require 'poseidon'
 require 'json'
+require 'logger'
+
 require './TopicProducerConfig'
+require_relative "../../common/kafka_utils.rb"
 
 class ProducerThread
   attr_reader :thread, :sourcetype, :sourceconfig, :source, :topic
@@ -71,13 +74,14 @@ class ProducerThread
           producer = topicproducer.get_producer_for_partition(partition)
 
           datafile = open(path)
-          # log "Downloaded: #{path} in #{Time.now - per_shard_time}"
+          log "Downloaded: #{path} in #{Time.now - per_shard_time}"
           gz = Zlib::GzipReader.new(datafile)
           msgs = []
           sent_messages = 0
           gz.each_line do |line|
             begin
-              msgs << Poseidon::MessageToSend.new(@topic, line)
+              
+              msgs << Poseidon::MessageToSend.new(@topic, gzip(line))
               # producer.send_messages([Poseidon::MessageToSend.new(topic, line)])
               # binding.pry
             rescue Exception => e

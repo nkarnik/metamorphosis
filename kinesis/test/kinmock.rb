@@ -42,41 +42,11 @@ shardids.each do |id|
   obj[:sqn] = 0
   obj[:sid] = id
   newsharditers << obj
-  oldsharditers <<  kclient.get_shard_iterator(:stream_name => testream, :shard_id => id, :shard_iterator_type => "TRIM_HORIZON")
 end
 
 sqnum = 0
 
 sharditers = []
-#br = false
-#loop do
-#
-#  if br == true
-#    log "breaking"
-#    break
-#  end
-#
-#  sleep 3
-#  newsharditers.each do |nsi|
-#    records = kclient.get_records(:shard_iterator => nsi[:si].shard_iterator)
-#    records.records.each do |record|
-#      log "#{record.sequence_number} #{record.data}"
-#      sqnum = record.sequence_number
-#      nsi[:sqn] = sqnum.to_s
-#       
-#      br = true
-#      
-#      log nsi[:sqn]
-#      sharditers.each do |si|
-#        if si[:sid] == nsi[:sid] 
-#          sharditers << nsi
-#        end
-#      end
-#    end 
-#    si = records.next_shard_iterator
-#
-#  end 
-#end
 
 sharditers.each do |si|
   log "Sharditer for #{si[:sid]}"
@@ -103,27 +73,6 @@ newsharditers.each do |nsi|
 end
 
 
-#loop do
-#  sharditers.each do |si|
-#    log si[:sqn]
-#    log si[:sid].class
-#    sharditer = kclient.get_shard_iterator(:stream_name => "TestStream", :shard_id => si[:sid], :shard_iterator_type => "LATEST") 
-#    records = kclient.get_records(:shard_iterator => sharditer.shard_iterator)
-#    log records.records.length
-#    records.records.each do |record|
-#      log "#{record.sequence_number} #{record.data}"
-#      sqnum = record.sequence_number
-#      si[:sqn] = sqnum.to_s
-#      #br = true
-#      log "#{si[:sqn]} #{si[:sid]}"
-#    end
-#    si = records.next_shard_iterator
-#    log "tried records"
-#  end
-#end
-
-
-
 workers = []
 begin
   log sharditers.length.to_s
@@ -141,7 +90,7 @@ begin
             log " QWER #{si[:sid]}"
             sharditer =  kclient.get_shard_iterator(:stream_name => testream, :shard_id => si[:sid], :shard_iterator_type => "LATEST")
             log "created sharditer for #{si[:sid]}"
-            sleep 2
+            sleep 20
             log "Sharditer for #{testream}"    
           else
             sharditer = kclient.get_shard_iterator(:stream_name => testream, :shard_id => si[:sid], :shard_iterator_type => "AFTER_SEQUENCE_NUMBER", :starting_sequence_number => si[:sqn])
@@ -149,11 +98,11 @@ begin
  
           records = kclient.get_records(:shard_iterator => sharditer.shard_iterator)
           log "#{records.records.length} records for #{si[:sid]} shard"
+          sleep 5
           records.records.each do |record|
             log "#{record.sequence_number} sequence number with #{record.data} data"
             sqnum = record.sequence_number
-            si[:sqn] = sqnum.to_s
-            sleep 10
+            si[:sqn] = sqnum.to_s 
             log "#{si[:sqn]} #{si[:sid]}"
           end
           si = records.next_shard_iterator

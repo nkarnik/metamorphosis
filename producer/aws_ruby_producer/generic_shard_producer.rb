@@ -99,7 +99,7 @@ log "Leader: #{leader}"
 log "Consumer : #{@consumer}"
 
 def read_from_queue(cons, worker_q)
-  # loop do
+  loop do
     log "Starting loop"
     #Fetch messages from dedicated worker queue, push message to work_q
 
@@ -108,11 +108,11 @@ def read_from_queue(cons, worker_q)
     begin
 
       log "Getting message now... consumer: #{@consumer}"
-      messages = @consumer.fetch({:max_bytes => 100000})
+      messages = @consumer.fetch({:max_bytes => 1000000})
       log "Got message?"
       log "Messages received: #{messages}"
       log "#{messages.length} messages received"
-      sleep 100
+      #sleep 100
       messages.each do |m|
         message = m.value
         log message
@@ -136,13 +136,16 @@ def read_from_queue(cons, worker_q)
       log "ERROR: #{e.message}"
       #puts "error"
     end
-  # end
+  end
 end
 
-#SET FLAG -> reading from queue should either be one time or threaded
+#SET FLAG -> reading from queue should either be one time limited or threaded
 q_thread = Thread.new{read_from_queue(consumers, $work_q)}
 # q_thread.join
 # read_from_queue(consumers, $work_q)
+
+# q_thread needs time to start before worker threads can pull from $work_q
+sleep 10
 
 start_time = Time.now
 puts "Start time: #{start_time}"
@@ -150,7 +153,7 @@ puts "Start time: #{start_time}"
 #Spin up selected number of threads, generate sources based on configs
 workers = []
 num_threads.times do |thread_num|
-
+  log "starting Producer thread #{thread_num}"
   t = ProducerThread.new(LOGFILE, num_threads, thread_num, start_time)
   t.start($work_q, $topic_producer_hash)
   workers << t.thread

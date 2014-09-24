@@ -21,93 +21,90 @@ AWS.config(
           :secret_access_key => 'F9rmZ36zlk2rNNRunsbYQh53+OF6rPdzy6HtI6bf'
           )
 
-kclient = AWS::Kinesis::Client.new
-testream = kclient.list_streams.stream_names[0]
+kClient = AWS::Kinesis::Client.new
+testream = kClient.list_streams.stream_names[0]
 
+#Get all shardids from stream description
 shardids = []
-idhash = {}
 
-kclient.describe_stream(:stream_name => testream).stream_description.shards.each do |shard|
+kClient.describe_stream(:stream_name => testream).stream_description.shards.each do |shard|
   log shard.shard_id
   shardids << shard.shard_id
 end
 
-#get old messages and shard iterator for new messages
-oldsharditers = []
-newsharditers = []
-
+#get shard iterator for new messages
+newshardIterators = []
 shardids.each do |id|
   obj = {}
-  obj[:si] =  kclient.get_shard_iterator(:stream_name => testream, :shard_id => id, :shard_iterator_type => "LATEST")
+  obj[:si] =  kClient.get_shard_iterator(:stream_name => testream, :shard_id => id, :shard_iterator_type => "LATEST")
   obj[:sqn] = 0
-  obj[:sid] = id
-  newsharditers << obj
+  obj[:sId] = id
+  newshardIterators << obj
 end
 
 sqnum = 0
 
-sharditers = []
+shardIterators = []
 
-sharditers.each do |si|
-  log "Sharditer for #{si[:sid]}"
+shardIterators.each do |si|
+  log "Shard Iterator for #{si[:sId]}"
 end
 
-newsharditers.each do |nsi|
+newshardIterators.each do |nsi|
   found = false
-  log "This many sharditers #{sharditers.length}"
-  sharditers.each do |si|
-    log nsi[:sid]
-    log si[:sid]
-    if si[:sid] == nsi[:sid]
+  log "This many shardIterators #{shardIterators.length}"
+  shardIterators.each do |si|
+    log nsi[:sId]
+    log si[:sId]
+    if si[:sId] == nsi[:sId]
       found = true
       next
     end
   end
 
   if found == true
-    log "found for #{nsi[:sid]}"
+    log "found for #{nsi[:sId]}"
     next
   else
-    sharditers << nsi
+    shardIterators << nsi
   end
 end
 
 
 workers = []
 begin
-  log sharditers.length.to_s
-  sharditers.length.times  do |num|
+  log shardIterators.length.to_s
+  shardIterators.length.times  do |num|
     thread = Thread.new do 
       loop do
         begin
-          si = sharditers[num]
-          log "ASDF #{si[:sid].to_s}, #{si[:sqn].to_s}"
-          #log si[:sqn]
-          #log si[:sid].class
-          log "shard iter: #{si}"
-          log si[:sqn]
-          if si[:sqn] == 0 
-            log " QWER #{si[:sid]}"
-            sharditer =  kclient.get_shard_iterator(:stream_name => testream, :shard_id => si[:sid], :shard_iterator_type => "LATEST")
-            log "created sharditer for #{si[:sid]}"
-            sleep 20
-            log "Sharditer for #{testream}"    
+          si = shardIterators[num]
+          log "Got Shard Iterator for: #{si[:sId]} starting from sequence number #{si[:sqn]}"
+   
+          # If that particular shard hasn't had any records received yet, then start from "LATEST" otherwise
+          # start from that shard's last sequence number
+          if si[:sqn] == 0        
+            sharditer =  kClient.get_shard_iterator(:stream_name => testream, :shard_id => si[:sId], :shard_iterator_type => "LATEST")
+            log "Created Shard Iterator for shard id: #{si[:sId]} with stream #{testream}"
+            sleep 10
           else
-            sharditer = kclient.get_shard_iterator(:stream_name => testream, :shard_id => si[:sid], :shard_iterator_type => "AFTER_SEQUENCE_NUMBER", :starting_sequence_number => si[:sqn])
+            sharditer = kClient.get_shard_iterator(:stream_name => testream, :shard_id => si[:sId], :shard_iterator_type => "AFTER_SEQUENCE_NUMBER", :starting_sequence_number => si[:sqn])
           end
  
-          records = kclient.get_records(:shard_iterator => sharditer.shard_iterator)
-          log "#{records.records.length} records for #{si[:sid]} shard"
+          records = kClient.get_records(:shard_iterator => sharditer.shard_iterator)
+          log "Retreived #{records.records.length} records for #{si[:sId]} shard"
           sleep 5
+     
           records.records.each do |record|
-            log "#{record.sequence_number} sequence number with #{record.data} data"
+            log "Using a shard iterator for shard #{si[:sId]} \nwith sequence number #{record.sequence_number}\nreceived message #{record.data} data"
             sqnum = record.sequence_number
             si[:sqn] = sqnum.to_s 
-            log "#{si[:sqn]} #{si[:sid]}"
+           
           end
-          si = records.next_shard_iterator
+      
           #log "tried records"
         rescue
+          # Just for debugging
           sleep 3
           log "symbol error"
         end

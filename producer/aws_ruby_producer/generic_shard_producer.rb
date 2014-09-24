@@ -111,6 +111,8 @@ def read_from_queue(cons, worker_q)
       messages = @consumer.fetch({:max_bytes => 100000})
       log "Got message?"
       log "Messages received: #{messages}"
+      log "#{messages.length} messages received"
+      sleep 100
       messages.each do |m|
         message = m.value
         log message
@@ -137,12 +139,10 @@ def read_from_queue(cons, worker_q)
   # end
 end
 
-# q_thread = Thread.new{read_from_queue(consumers, $work_q)}
+#SET FLAG -> reading from queue should either be one time or threaded
+q_thread = Thread.new{read_from_queue(consumers, $work_q)}
 # q_thread.join
-
-# binding.pry
-
-read_from_queue(consumers, $work_q)
+# read_from_queue(consumers, $work_q)
 
 start_time = Time.now
 puts "Start time: #{start_time}"

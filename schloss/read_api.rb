@@ -66,7 +66,13 @@ if env == "local"
 else
   fqdns = find_broker(env)
 end
-queues = $options[:queues].split(",") || fdns.map{|n| n.split(":").first}
+log "fqdns: #{fqdns}"
+
+begin
+  queues = $options[:queues].split(",")
+rescue
+  queues = fqdns.map{|n| n.split(":").first}
+end
 
 log "fqdns: #{fqdns}"
 if queues.size != fqdns.size

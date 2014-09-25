@@ -21,3 +21,12 @@ def find_broker(env, attrib = 'fqdn')
   return JSON.parse(results)["rows"].map{ |a| a.map{|k,v| v["fqdn"]}  }.map{|v| "#{v[0]}:9092"}
 end
 
+def gzip(string)
+  require 'zlib'
+  require 'stringio'
+  wio = StringIO.new("w")
+  w_gz = Zlib::GzipWriter.new(wio)
+  w_gz.write(string)
+  w_gz.close
+  return wio.string
+end

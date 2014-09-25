@@ -136,13 +136,18 @@ def read_from_queue(cons, worker_q)
       log "ERROR: #{e.message}"
       #puts "error"
     end
+
+  if env == "local"
+    break
+  end 
+
   end
 end
 
-#SET FLAG -> reading from queue should either be one time limited or threaded
+#SET FLAG -> reading from queue should either be one time limited or threaded -- if env is local, thread terminates early
 q_thread = Thread.new{read_from_queue(consumers, $work_q)}
 # q_thread.join
-# read_from_queue(consumers, $work_q)
+
 
 # q_thread needs time to start before worker threads can pull from $work_q
 sleep 10
@@ -157,7 +162,6 @@ num_threads.times do |thread_num|
   t = ProducerThread.new(LOGFILE, num_threads, thread_num, start_time)
   t.start($work_q, $topic_producer_hash)
   workers << t.thread
-
 end
 
 workers.map(&:join);

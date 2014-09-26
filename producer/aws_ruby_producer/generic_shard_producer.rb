@@ -138,6 +138,7 @@ def read_from_queue(cons, worker_q)
     end
 
   if env == "local"
+    log "Local environment, so limiting # of shards"
     break
   end 
 

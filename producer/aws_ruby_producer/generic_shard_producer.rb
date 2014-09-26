@@ -57,7 +57,7 @@ end
 
 #Parse and set options
 opt_parser.parse!
-env = $options[:env] || "local"
+@env = $options[:env] || "local"
 
 queue_name = $options[:queue_name] || "#{host}.ec2.internal"
 
@@ -71,17 +71,17 @@ $work_q = Queue.new
 
 #pass in env (test/prod) and get fqdns of all kafka brokers
 
-if env == "local"
+if @env == "local"
   fqdns = brokers.split(",")
 else
-  fqdns = find_broker(env)
+  fqdns = find_broker(@env)
 end
 
 puts "fqdns: #{fqdns}"
 consumers = []
 producers = []
 
-log "Config:\nenv: #{env}\nQueue: #{queue_name}\nThreads: #{num_threads}\nseed brokers: #{fqdns}"
+log "Config:\nenv: #{@env}\nQueue: #{queue_name}\nThreads: #{num_threads}\nseed brokers: #{fqdns}"
 
 $topic_producer_hash = {}
 seed_brokers = fqdns
@@ -98,7 +98,7 @@ log "Leader: #{leader}"
 
 log "Consumer : #{@consumer}"
 
-def read_from_queue(cons, worker_q)
+def read_from_queue()
   loop do
     log "Starting loop"
     #Fetch messages from dedicated worker queue, push message to work_q
@@ -120,8 +120,8 @@ def read_from_queue(cons, worker_q)
         log "Processing message: #{message}"
 
         topic = message["topic"]
-        worker_q << message
-        #log worker_q.size
+        $work_q << message
+        log $work_q.size
         #log topic
         # build TopicProducer configuration object for topic
         if not $topic_producer_hash.has_key?(topic)
@@ -134,10 +134,10 @@ def read_from_queue(cons, worker_q)
       end
     rescue Exception => e
       log "ERROR: #{e.message}"
-      #puts "error"
+    
     end
 
-  if env == "local"
+  if @env == "local"
     break
   end 
 
@@ -145,8 +145,8 @@ def read_from_queue(cons, worker_q)
 end
 
 #SET FLAG -> reading from queue should either be one time limited or threaded -- if env is local, thread terminates early
-q_thread = Thread.new{read_from_queue(consumers, $work_q)}
-# q_thread.join
+q_thread = Thread.new{read_from_queue()}
+#q_thread.join
 
 
 # q_thread needs time to start before worker threads can pull from $work_q

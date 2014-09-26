@@ -4,6 +4,7 @@ require 'aws-sdk'
 require 'poseidon'
 require 'optparse'
 require 'pry'
+require './SourceQueue'
 require './TopicProducerConfig'
 require './SourceThread'
 require_relative "../../common/kafka_utils.rb"
@@ -65,7 +66,7 @@ num_threads = $options[:threads].to_i || "1"
 num_shards = $options[:num_shards].to_i || "10"
 brokers = $options[:brokers] || ["localhost:9092"]
 
-$work_q = Queue.new
+$work_q = SourceQueue.new
 
 
 
@@ -120,7 +121,7 @@ def read_from_queue()
         log "Processing message: #{message}"
 
         topic = message["topic"]
-        $work_q << message
+        $work_q.push(message)
         log $work_q.size
         #log topic
         # build TopicProducer configuration object for topic

@@ -38,6 +38,7 @@ class SourceQueue
 
     currentQueue = @queues.keys[@num % @queues.length ]
     @num += 1
+    @size -= 1
     return @queues[currentQueue].pop(true)
   end
 

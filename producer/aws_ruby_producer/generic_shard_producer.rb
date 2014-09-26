@@ -116,13 +116,13 @@ def read_from_queue()
       #sleep 100
       messages.each do |m|
         message = m.value
-        log message
+        #log message
         message = JSON.parse(message)
-        log "Processing message: #{message}"
+        #log "Processing message: #{message}"
 
         topic = message["topic"]
         $work_q.push(message)
-        log $work_q.size
+        #log $work_q.size
         #log topic
         # build TopicProducer configuration object for topic
         if not $topic_producer_hash.has_key?(topic)
@@ -132,11 +132,14 @@ def read_from_queue()
           a = topicproducer.partitions_on_localhost
           log "Finished creating producer for #{topic}"
         end
+      #sleep 0.1
       end
     rescue Exception => e
       log "ERROR: #{e.message}"
     
     end
+  #make sure we're not hammering kafka
+  sleep 5
 
 
   if @env == "local"

@@ -33,7 +33,7 @@ class Sinker
       loop do
         begin
           log "Getting message now... consumer: #{@consumer}"
-          messages = @consumer.fetch({:max_bytes => 1000000})
+          messages = @sinkConsumer.fetch({:max_bytes => 1000000})
       
           log "Messages received: #{messages}"
           log "#{messages.length} messages received"
@@ -78,17 +78,36 @@ class Sink
   def start()
     
     @thread = Thread.new do
-      #return
+      #read from topic and sink
+      loop do
+        begin
+          log "Getting message now... consumer: #{@consumer}"
+          
+          #TODO set batch size for max_bytes
+          messages = @consumer.fetch({:max_bytes => 1000000})
       
-    end
+          log "Messages received: #{messages}"
+          log "#{messages.length} messages received"
+          msgsToSink = []
+          messages.each do |m|
+            message = m.value
+            message = JSON.parse(message)
+            msgsToSink << message 
+          end
+          sink(msgsToSink)
 
+        rescue Exception => e
+          log "ERROR: #{e.message}"
+        end
+
+      end
+    end
   end
 
-  #sink to S3 or whatever here, after batching messages to shard
+  #sink to S3 or whatever here, after batching messages
   def sink()
     return
   end
-
 
 end
 

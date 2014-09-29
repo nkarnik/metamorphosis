@@ -45,7 +45,7 @@ class SourceManager
     end
 
     @run_num = 0
-    log "finished creating"
+    log "Finished Creating source manager"
   end
 
   def log(msg)
@@ -58,13 +58,13 @@ class SourceManager
   end
 
   def start()
-    log "about to start"
+ 
     begin
     @thread = Thread.new do
-      log "starting source manager"
+      log "Starting source manager"
       loop do
         begin
-          log "Waiting on message"
+          #log "Waiting on message"
           messages = @sourceConsumer.fetch({:max_bytes => 100000}) # Timeout? 
           messages.each do |m|
             message = m.value
@@ -117,11 +117,11 @@ class SourceManager
           log "ERROR: #{e.message}\n#{e.backtrace}"
         end
         
-        run_num += 1
+        @run_num += 1
       
         if @total_runs > 0
-          if run_num >= total_runs
-            log "Breaking because we wanted only #{total_runs}, and completed #{run_num} runs"
+          if @run_num >= @total_runs
+            log "Breaking because we wanted only #{@total_runs}, and completed #{@run_num} runs"
             break
           end
         end

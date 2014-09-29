@@ -3,6 +3,7 @@ require 'thread'
 require "aws-sdk"
 require "poseidon"
 require "optparse"
+require "./Sinker.rb"
 require_relative("../common/kafka_utils.rb")
 
 LOGFILE = "kafka_consumer.log"
@@ -39,6 +40,10 @@ opt_parser = OptionParser.new do |opt|
     $options[:topic] = topic
   end
 
+  opt.on("--sink_topic SINK",String,"Required, needed for knowing where to sink from") do |sink|
+    $options[:sink] = sink
+  end
+  
   opt.on("--brokers BROKERS",String, "Optional, for local send in the brokers") do |brokers|
     $options[:brokers] = brokers
   end
@@ -52,12 +57,15 @@ opt_parser = OptionParser.new do |opt|
     $options[:runs] = runs
   end
 
+ 
+
 
 end
 
 opt_parser.parse!
 env = $options[:env] || "local"
 topic = $options[:topic] 
+sinkTopic = $options[:sink_topic] 
 brokers = $options[:brokers] || ["localhost:9092"]
 total_runs = $options[:runs] || 0
 
@@ -93,6 +101,11 @@ consumer = Poseidon::PartitionConsumer.new("topic_consumer", leader.split(":").f
 shard_writer = Poseidon::Producer.new(fqdns, "mockwriter", :type => :sync)
 
 con = 0
+
+# Start Sinker
+sinker = Sink.new(sinkTopic, LOGFILE, fqdns)
+sinker.start()
+
 
 local_manifest = "manifest"
 if File.exists? local_manifest

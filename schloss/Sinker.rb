@@ -41,7 +41,9 @@ class Sinker
             message = m.value
             message = JSON.parse(message)
             topic = message["topic"]
-            sink = Sink.new(topic, @fqdns)
+            bucket = message["bucket"]
+            key = message["key"]
+            sink = Sink.new(topic, @fqdns, bucket, key, @logfile)
             sink.start()
           end
         rescue Exception => e
@@ -59,10 +61,18 @@ end
 class Sink
 
   attr_reader :topic
-  def initialize(topic, fqdns)
+  def initialize(topic, fqdns, bucket, key, logfile)
 
+    AWS.config(
+               :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
+               :secret_access_key => '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'
+               ) 
+
+    @logfile = logfile
+    @_key = key
     @topic = topic
     @thread = nil
+    @shardNum = 0
     
     leaders_per_partition = get_leaders_for_partitions(@topic, fqdns)
     leader = leaders_per_partition.first
@@ -72,6 +82,8 @@ class Sink
 
     log "Consumer : #{@consumer}"
 
+    @_s3 = AWS::S3.new
+    @_bucket = @_s3.buckets[bucket] 
 
   end
 
@@ -92,6 +104,7 @@ class Sink
           messages.each do |m|
             message = m.value
             message = JSON.parse(message)
+            #TODO parse message into writable tupl
             msgsToSink << message 
           end
           sink(msgsToSink)
@@ -105,10 +118,33 @@ class Sink
   end
 
   #sink to S3 or whatever here, after batching messages
-  def sink()
-    return
-  end
+  def sink(messages)
+    
+    #first write messages to local file
+    @path = "/tmp/" + @_key + ".gz"
+    s3path = @_key + @shardNum.to_s + ".gz"
+    
+    begin
+      
+      File.open(@path, 'wb') do |file|
+        messages.each do |tuple|
+          file.write(tuple)
+          file.write("\n")
+        end
+      end
 
+      s3writer = @_bucket.objects[s3path]
+      s3writer.write(Pathname.new(@path))
+
+      File.delete @path
+      @shardNum += 1
+
+    rescue
+      log "S3 shard upload error"
+
+    end
+
+  end
 end
 
 

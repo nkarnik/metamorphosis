@@ -137,6 +137,19 @@ class KafkaSource
 
 end
 
+class KinesisSource < KafkaSource
+
+  def initialize(sourceconfig, logfile)
+    return
+  end
+
+  def get_data
+    return
+  end
+
+end
+
+
 
 class S3Source < KafkaSource
   attr_reader :path

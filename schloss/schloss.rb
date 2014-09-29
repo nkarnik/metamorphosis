@@ -3,7 +3,9 @@ require 'thread'
 require "aws-sdk"
 require "poseidon"
 require "optparse"
-require "./Sinker.rb"
+require "./SinkManager.rb"
+require "./SourceManager.rb"
+
 require_relative("../common/kafka_utils.rb")
 
 LOGFILE = "kafka_consumer.log"
@@ -91,10 +93,10 @@ end
 # fqdns[hostnum].split(":").first
 log "Config:\nenv: #{env}\nsourceTopic: #{sourceTopic}\nbrokers: #{brokers}\nruns: #{total_runs}\nqueues: #{queues}"
 
-# Start Sourcer
-sourcer = Sourcer.new(sourceTopic, LOGFILE, fqdns, total_runs)
-sourcer.start()
+# Start SourceManager
+sourceManager = SourceManager.new(sourceTopic, LOGFILE, fqdns, total_runs)
+sourceManager.start()
 
 # Start Sinker
-sinker = Sinker.new(sinkTopic, LOGFILE, fqdns)
-sinker.start()
+sinkManager = SinkManager.new(sinkTopic, LOGFILE, fqdns)
+sinkManager.start()

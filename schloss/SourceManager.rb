@@ -6,7 +6,7 @@ require "logger"
 
 require_relative "../../common/kafka_utils.rb"
 
-class Sourcer
+class SourceManager
 
   attr_reader :sourceTopic, :thread
   def initialize(sourcetopic, logfile, fqdns, total_runs=0)

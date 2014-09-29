@@ -6,7 +6,7 @@ require "logger"
 
 require_relative "../../common/kafka_utils.rb"
 
-class Sinker
+class SinkManager
   
   attr_reader :sinkTopic, :thread
   def initialize(sinktopic, logfile, fqdns)

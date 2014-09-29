@@ -3,6 +3,9 @@ require 'thread'
 require "aws-sdk"
 require "poseidon"
 require "optparse"
+require "./SinkManager.rb"
+require "./SourceManager.rb"
+
 require_relative("../common/kafka_utils.rb")
 
 LOGFILE = "kafka_consumer.log"
@@ -35,10 +38,14 @@ opt_parser = OptionParser.new do |opt|
     $options[:env] = env
   end
 
-  opt.on("--topic TOPIC", String, "Required. Topic to read from? prod,test,local") do |topic|
-    $options[:topic] = topic
+  opt.on("--source_topic SOURCE", String, "Required. Topic to read from? prod,test,local") do |source|
+    $options[:source_topic] = source
   end
 
+  opt.on("--sink_topic SINK",String,"Required, needed for knowing where to sink from") do |sink|
+    $options[:sink_topic] = sink
+  end
+  
   opt.on("--brokers BROKERS",String, "Optional, for local send in the brokers") do |brokers|
     $options[:brokers] = brokers
   end
@@ -52,12 +59,15 @@ opt_parser = OptionParser.new do |opt|
     $options[:runs] = runs
   end
 
+ 
+
 
 end
 
 opt_parser.parse!
 env = $options[:env] || "local"
-topic = $options[:topic] 
+sourceTopic = $options[:source_topic] 
+sinkTopic = $options[:sink_topic] 
 brokers = $options[:brokers] || ["localhost:9092"]
 total_runs = $options[:runs] || 0
 
@@ -79,88 +89,16 @@ if queues.size != fqdns.size
   log "ERROR: Number of queues does not match brokers: Qs: #{queues} vs Broker fqdns: #{fqdns}"
   exit
 end
+
 # fqdns[hostnum].split(":").first
-log "Config:\nenv: #{env}\ntopic: #{topic}\nbrokers: #{brokers}\nruns: #{total_runs}\nqueues: #{queues}"
+log "Config:\nenv: #{env}\nsourceTopic: #{sourceTopic}\nbrokers: #{brokers}\nruns: #{total_runs}\nqueues: #{queues}"
 
-leaders_per_partition = get_leaders_for_partitions(topic, fqdns)
+# Start SourceManager
+sourceManager = SourceManager.new(sourceTopic, LOGFILE, fqdns, total_runs, queues)
+sourceManager.start()
 
-log "Leaders: #{leaders_per_partition}"
-# Assuming one partition for this topic, find the singular leader
-leader = leaders_per_partition.first
+# Start Sinker
+#sinkManager = SinkManager.new(sinkTopic, LOGFILE, fqdns)
+#sinkManager.start()
 
-consumer = Poseidon::PartitionConsumer.new("topic_consumer", leader.split(":").first, leader.split(":").last, topic, 0, :earliest_offset)
-
-shard_writer = Poseidon::Producer.new(fqdns, "mockwriter", :type => :sync)
-
-con = 0
-
-local_manifest = "manifest"
-if File.exists? local_manifest
-  File.delete local_manifest
-end
-run_num = 0
-loop do
-  begin
-    #log "Waiting on message"
-    messages = consumer.fetch({:max_bytes => 100000}) # Timeout? 
-    messages.each do |m|
-      message = m.value
-      message = JSON.parse(message)
-      log "Processing  message: #{message}"
-
-      bucket_name = message["source"]["config"]["bucket"]
-      manifest_path = message["source"]["config"]["manifest"]
-      topic_to_write = message["topic"]
-      sourcetype = message["source"]["type"]
-      bucket = s3.buckets[bucket_name]
-      log "Downloading Manifest from #{manifest_path} for topic: #{topic_to_write} in bucket: #{bucket_name}"
-      
-      # If source type is s3
-      File.open(local_manifest, 'wb') do |file|
-        log "Opened file: #{file}"
-        bucket.objects[manifest_path].read do |chunk|
-          begin
-            file.write(chunk)
-          rescue
-            log "s3 error for path: #{f}"
-          end
-        end
-      end
-      # log "Manifest length: #{`wc -l #{local_manifest}`}"
-      hosts = fqdns.length
-      log "Hosts #{hosts}"
-      lines_consumed = 0
-      File.open(local_manifest).each do |line|
-        config = {:bucket => bucket_name, :shard => line.chomp}
-        source = {:type => sourcetype, :config => config}
-        info = {:source => source, :topic => topic_to_write}.to_json
-        hostnum = lines_consumed % hosts
-        broker_topic = queues[hostnum]
-        msgs = []
-        log "Writing to topic: #{broker_topic} message: #{info}"
-        
-        msgs << Poseidon::MessageToSend.new(broker_topic, info)
-        unless shard_writer.send_messages(msgs)
-          log "message send error: #{broker_topic}"
-        end
-        
-        lines_consumed += 1
-      end
-      log "Number of shards emitted into #{topic}: #{lines_consumed}"
-
-
-    end
-  rescue => e
-    log "ERROR: #{e.message}\n#{e.backtrace}"
-  end
-  
-  run_num += 1
-
-  if total_runs > 0
-    if run_num >= total_runs
-      log "Breaking because we wanted only #{total_runs}, and completed #{run_num} runs"
-      break
-    end
-  end
-  #log "Looping: #{run_num}"
-end
+sourceManager.thread.join

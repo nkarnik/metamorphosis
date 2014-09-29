@@ -4,6 +4,7 @@ require 'aws-sdk'
 require 'poseidon'
 require 'optparse'
 require 'pry'
+require './SourceQueue'
 require './TopicProducerConfig'
 require './SourceThread'
 require_relative "../../common/kafka_utils.rb"
@@ -57,7 +58,7 @@ end
 
 #Parse and set options
 opt_parser.parse!
-env = $options[:env] || "local"
+@env = $options[:env] || "local"
 
 queue_name = $options[:queue_name] || "#{host}.ec2.internal"
 
@@ -65,23 +66,23 @@ num_threads = $options[:threads].to_i || "1"
 num_shards = $options[:num_shards].to_i || "10"
 brokers = $options[:brokers] || ["localhost:9092"]
 
-$work_q = Queue.new
+$work_q = SourceQueue.new
 
 
 
 #pass in env (test/prod) and get fqdns of all kafka brokers
 
-if env == "local"
+if @env == "local"
   fqdns = brokers.split(",")
 else
-  fqdns = find_broker(env)
+  fqdns = find_broker(@env)
 end
 
 puts "fqdns: #{fqdns}"
 consumers = []
 producers = []
 
-log "Config:\nenv: #{env}\nQueue: #{queue_name}\nThreads: #{num_threads}\nseed brokers: #{fqdns}"
+log "Config:\nenv: #{@env}\nQueue: #{queue_name}\nThreads: #{num_threads}\nseed brokers: #{fqdns}"
 
 $topic_producer_hash = {}
 seed_brokers = fqdns
@@ -98,7 +99,7 @@ log "Leader: #{leader}"
 
 log "Consumer : #{@consumer}"
 
-def read_from_queue(cons, worker_q)
+def read_from_queue()
   loop do
     log "Starting loop"
     #Fetch messages from dedicated worker queue, push message to work_q
@@ -115,13 +116,13 @@ def read_from_queue(cons, worker_q)
       #sleep 100
       messages.each do |m|
         message = m.value
-        log message
+        #log message
         message = JSON.parse(message)
-        log "Processing message: #{message}"
+        #log "Processing message: #{message}"
 
         topic = message["topic"]
-        worker_q << message
-        #log worker_q.size
+        $work_q.push(message)
+        #log $work_q.size
         #log topic
         # build TopicProducer configuration object for topic
         if not $topic_producer_hash.has_key?(topic)
@@ -131,13 +132,18 @@ def read_from_queue(cons, worker_q)
           a = topicproducer.partitions_on_localhost
           log "Finished creating producer for #{topic}"
         end
+      #sleep 0.1
       end
     rescue Exception => e
       log "ERROR: #{e.message}"
-      #puts "error"
+    
     end
+  #make sure we're not hammering kafka
+  sleep 5
 
-  if env == "local"
+
+  if @env == "local"
+    log "Local environment, so limiting # of shards"
     break
   end 
 
@@ -145,8 +151,8 @@ def read_from_queue(cons, worker_q)
 end
 
 #SET FLAG -> reading from queue should either be one time limited or threaded -- if env is local, thread terminates early
-q_thread = Thread.new{read_from_queue(consumers, $work_q)}
-# q_thread.join
+q_thread = Thread.new{read_from_queue()}
+#q_thread.join
 
 
 # q_thread needs time to start before worker threads can pull from $work_q

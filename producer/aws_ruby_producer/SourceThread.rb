@@ -48,6 +48,7 @@ class ProducerThread
         log "Number of shards left to push into kafka: " + work_q.size.to_s
 
         while s = work_q.pop(true)
+          log "Queue size is #{work_q.size} with num: #{work_q.num}, and this many queues: #{work_q.queues.length} with info #{work_q.info}"
           @sourcetype = s["source"]["type"]
           @sourceconfig = s["source"]["config"]
           @source = createSource()
@@ -104,7 +105,7 @@ class ProducerThread
         end
       rescue SystemExit, Interrupt, Exception => te
         log "Thread Completed: #{te.message}.\n\n\tTotal Messages for this thread: #{num_msgs_per_thread}\n\n"
-        puts te.backtrace unless te.message.include?("queue empty")
+        puts te.backtrace #unless te.message.include?("queue empty")
         Thread.exit
       end
     end

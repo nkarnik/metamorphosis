@@ -101,7 +101,7 @@ end
 run_num = 0
 loop do
   begin
-    log "Waiting on message"
+    #log "Waiting on message"
     messages = consumer.fetch({:max_bytes => 100000}) # Timeout? 
     messages.each do |m|
       message = m.value
@@ -162,5 +162,5 @@ loop do
       break
     end
   end
-  log "Looping: #{run_num}"
+  #log "Looping: #{run_num}"
 end

@@ -4,7 +4,7 @@ require "json"
 require "poseidon"
 require "logger"
 
-require_relative "../../common/kafka_utils.rb"
+require_relative "../common/kafka_utils.rb"
 
 class SinkManager
   

@@ -39,11 +39,11 @@ opt_parser = OptionParser.new do |opt|
   end
 
   opt.on("--source_topic SOURCE", String, "Required. Topic to read from? prod,test,local") do |source|
-    $options[:source] = source
+    $options[:source_topic] = source
   end
 
   opt.on("--sink_topic SINK",String,"Required, needed for knowing where to sink from") do |sink|
-    $options[:sink] = sink
+    $options[:sink_topic] = sink
   end
   
   opt.on("--brokers BROKERS",String, "Optional, for local send in the brokers") do |brokers|
@@ -94,9 +94,11 @@ end
 log "Config:\nenv: #{env}\nsourceTopic: #{sourceTopic}\nbrokers: #{brokers}\nruns: #{total_runs}\nqueues: #{queues}"
 
 # Start SourceManager
-sourceManager = SourceManager.new(sourceTopic, LOGFILE, fqdns, total_runs)
+sourceManager = SourceManager.new(sourceTopic, LOGFILE, fqdns, total_runs, queues)
 sourceManager.start()
 
 # Start Sinker
-sinkManager = SinkManager.new(sinkTopic, LOGFILE, fqdns)
-sinkManager.start()
+#sinkManager = SinkManager.new(sinkTopic, LOGFILE, fqdns)
+#sinkManager.start()
+
+sourceManager.thread.join

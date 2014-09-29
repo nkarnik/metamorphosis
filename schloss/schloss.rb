@@ -36,8 +36,8 @@ opt_parser = OptionParser.new do |opt|
     $options[:env] = env
   end
 
-  opt.on("--topic TOPIC", String, "Required. Topic to read from? prod,test,local") do |topic|
-    $options[:topic] = topic
+  opt.on("--source_topic SOURCE", String, "Required. Topic to read from? prod,test,local") do |source|
+    $options[:source] = source
   end
 
   opt.on("--sink_topic SINK",String,"Required, needed for knowing where to sink from") do |sink|
@@ -64,7 +64,7 @@ end
 
 opt_parser.parse!
 env = $options[:env] || "local"
-topic = $options[:topic] 
+sourceTopic = $options[:source_topic] 
 sinkTopic = $options[:sink_topic] 
 brokers = $options[:brokers] || ["localhost:9092"]
 total_runs = $options[:runs] || 0
@@ -87,23 +87,12 @@ if queues.size != fqdns.size
   log "ERROR: Number of queues does not match brokers: Qs: #{queues} vs Broker fqdns: #{fqdns}"
   exit
 end
+
 # fqdns[hostnum].split(":").first
-log "Config:\nenv: #{env}\ntopic: #{topic}\nbrokers: #{brokers}\nruns: #{total_runs}\nqueues: #{queues}"
-
-leaders_per_partition = get_leaders_for_partitions(topic, fqdns)
-
-log "Leaders: #{leaders_per_partition}"
-# Assuming one partition for this topic, find the singular leader
-leader = leaders_per_partition.first
-
-consumer = Poseidon::PartitionConsumer.new("topic_consumer", leader.split(":").first, leader.split(":").last, topic, 0, :earliest_offset)
-
-shard_writer = Poseidon::Producer.new(fqdns, "mockwriter", :type => :sync)
-
-con = 0
+log "Config:\nenv: #{env}\nsourceTopic: #{sourceTopic}\nbrokers: #{brokers}\nruns: #{total_runs}\nqueues: #{queues}"
 
 # Start Sourcer
-sourcer = Sourcer.new(topic, LOGFILE, fqdns, total_runs)
+sourcer = Sourcer.new(sourceTopic, LOGFILE, fqdns, total_runs)
 sourcer.start()
 
 # Start Sinker

@@ -61,7 +61,9 @@ opt_parser.parse!
 @env = $options[:env] || "local"
 
 queue_name = $options[:queue_name] || "#{host}.ec2.internal"
-
+@offset = `cat offset*`.split().min.to_i || :earliest_offset
+log "offset is #{@offset}"
+sleep 2
 num_threads = $options[:threads].to_i || "1"
 num_shards = $options[:num_shards].to_i || "10"
 brokers = $options[:brokers] || ["localhost:9092"]
@@ -95,8 +97,7 @@ leaders_per_partition = get_leaders_for_partitions(queue_name, fqdns)
 leader = leaders_per_partition.first
 log "Leader: #{leader}"
 
-@consumer = Poseidon::PartitionConsumer.new(queue_name, leader.split(":").first, leader.split(":").last, queue_name, 0, :earliest_offset)
-
+@consumer = Poseidon::PartitionConsumer.new(queue_name, leader.split(":").first, leader.split(":").last, queue_name, 0, @offset)
 log "Consumer : #{@consumer}"
 
 def read_from_queue()
@@ -110,20 +111,21 @@ def read_from_queue()
 
       log "Getting message now... consumer: #{@consumer}"
       messages = @consumer.fetch({:max_bytes => 1000000})
-      log "Got message?"
+      log "Got message? with offset: #{@consumer.next_offset}"
       #log "Messages received: #{messages}"
       log "#{messages.length} messages received"
       #sleep 100
       messages.each do |m|
         message = m.value
-        #log message
+        log "message: #{message} with offset #{m.offset}"
         message = JSON.parse(message)
-        #log "Processing message: #{message}"
-
+        log "Processing message: #{message}"
+        log "topic is #{message["topic"]}"
+        info = {:message => message, :offset => m.offset}
         topic = message["topic"]
-        $work_q.push(message)
-        #log $work_q.size
-        #log topic
+        $work_q.push(info)
+        log $work_q.size
+        log topic
         # build TopicProducer configuration object for topic
         if not $topic_producer_hash.has_key?(topic)
           log "Creating new producer for #{topic}"

@@ -61,7 +61,7 @@ opt_parser.parse!
 @env = $options[:env] || "local"
 
 queue_name = $options[:queue_name] || "#{host}.ec2.internal"
-@offset = `cat offset*`.split().min
+@offset = `cat offset*`.split().min.to_i || :earliest_offset
 log "offset is #{@offset}"
 sleep 2
 num_threads = $options[:threads].to_i || "1"
@@ -97,12 +97,7 @@ leaders_per_partition = get_leaders_for_partitions(queue_name, fqdns)
 leader = leaders_per_partition.first
 log "Leader: #{leader}"
 
-if @offset.nil?
-  @consumer = Poseidon::PartitionConsumer.new(queue_name, leader.split(":").first, leader.split(":").last, queue_name, 0, :earliest_offset)
-else
-  @consumer = Poseidon::PartitionConsumer.new(queue_name, leader.split(":").first, leader.split(":").last, queue_name, 0, @offset.to_i)
-end
-
+@consumer = Poseidon::PartitionConsumer.new(queue_name, leader.split(":").first, leader.split(":").last, queue_name, 0, @offset)
 log "Consumer : #{@consumer}"
 
 def read_from_queue()

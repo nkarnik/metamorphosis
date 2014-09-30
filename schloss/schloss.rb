@@ -54,13 +54,13 @@ opt_parser = OptionParser.new do |opt|
     $options[:queues] = queues
   end
 
+  opt.on("--offset OFFSET",Integer, "Optional, for testing, don't loop for messages") do |offset|
+    $options[:offset] = offset
+  end
 
   opt.on("--runs RUNS",Integer, "Optional, for testing, don't loop for messages") do |runs|
     $options[:runs] = runs
   end
-
- 
-
 
 end
 
@@ -70,6 +70,7 @@ sourceTopic = $options[:source_topic]
 sinkTopic = $options[:sink_topic] 
 brokers = $options[:brokers] || ["localhost:9092"]
 total_runs = $options[:runs] || 0
+offset = $options[:offset] || nil
 
 if env == "local"
   fqdns = brokers.split(',')
@@ -94,7 +95,7 @@ end
 log "Config:\nenv: #{env}\nsourceTopic: #{sourceTopic}\nbrokers: #{brokers}\nruns: #{total_runs}\nqueues: #{queues}"
 
 # Start SourceManager
-sourceManager = SourceManager.new(sourceTopic, LOGFILE, fqdns, total_runs, queues)
+sourceManager = SourceManager.new(sourceTopic, LOGFILE, fqdns, total_runs, queues, offset)
 sourceManager.start()
 
 # Start Sinker

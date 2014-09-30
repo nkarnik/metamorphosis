@@ -9,7 +9,7 @@ require_relative "../common/kafka_utils.rb"
 class SourceManager
 
   attr_reader :sourceTopic, :thread
-  def initialize(sourcetopic, logfile, fqdns, total_runs=0, queues)
+  def initialize(sourcetopic, logfile, fqdns, total_runs=0, queues, offset)
 
     AWS.config(
           :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
@@ -18,6 +18,7 @@ class SourceManager
 
     @_s3 = AWS::S3.new
 
+    @offset = offset || :earliest_offset
     @queues = queues
     @sourceTopic = sourcetopic
     @thread = nil
@@ -32,7 +33,7 @@ class SourceManager
     # Assuming one partition for this topic, find the singular leader
     leader = leaders_per_partition.first
     
-    @sourceConsumer = Poseidon::PartitionConsumer.new("topic_consumer", leader.split(":").first, leader.split(":").last, @sourceTopic, 0, :earliest_offset)
+    @sourceConsumer = Poseidon::PartitionConsumer.new("topic_consumer", leader.split(":").first, leader.split(":").last, @sourceTopic, 0, @offset)
     
     @shardWriter = Poseidon::Producer.new(@fqdns, "mockwriter", :type => :sync)
     
@@ -45,6 +46,7 @@ class SourceManager
     end
 
     @run_num = 0
+    @messages_consumed = 0
     log "Finished Creating source manager"
   end
 
@@ -64,8 +66,11 @@ class SourceManager
       log "Starting source manager"
       loop do
         begin
-          #log "Waiting on message"
+          log "Waiting on message"
           messages = @sourceConsumer.fetch({:max_bytes => 100000}) # Timeout? 
+          log " #{messages} and topic: #{@sourceTopic}"
+          sleep 3
+          log "The next offset for the source consumer is: #{@sourceConsumer.next_offset}"
           messages.each do |m|
             message = m.value
             message = JSON.parse(message)
@@ -108,9 +113,10 @@ class SourceManager
               end
               
               lines_consumed += 1
+              @messages_consumed += 1
             end
             log "Number of shards emitted into #{@sourceTopic}: #{lines_consumed}"
-      
+            log "Total # of shards into #{@sourceTopic}: #{@messages_consumed}"
       
           end
         rescue => e

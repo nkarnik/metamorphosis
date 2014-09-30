@@ -13,7 +13,8 @@ class SourceQueue
   #pushes to existing queue dedicated to topic, otherwise creates and pushes to it
   def push(message)
     found = false
-    topic = message["topic"]
+    puts "message is #{message}"
+    topic = message[:message]["topic"]
     queues.each do |key, queue|
       if key == topic
         found = true
@@ -49,6 +50,5 @@ class SourceQueue
     return @queues[currentQueue].size()
 
   end
-
 
 end

@@ -47,7 +47,11 @@ class ProducerThread
         # log "producer: #{producer} for node: #{producer_fqdn}"
         log "Number of shards left to push into kafka: " + work_q.size.to_s
 
-        while s = work_q.pop(true)
+        while i = work_q.pop(true)
+          s = i[:message]
+          offset = i[:offset]
+          log "Popped message with offset #{offset}"
+          `echo #{offset} > offset#{@thread_num}`
           log "Queue size is #{work_q.size} with num: #{work_q.num}, and this many queues: #{work_q.queues.length} with info #{work_q.info}"
           @sourcetype = s["source"]["type"]
           @sourceconfig = s["source"]["config"]

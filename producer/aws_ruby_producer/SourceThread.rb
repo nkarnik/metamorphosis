@@ -159,22 +159,26 @@ class KinesisSource < KafkaSource
               )
 
     @logfile = logfile
-    
+    log "Creating kinesis source"
+ 
     @_kinesis = AWS::Kinesis::Client.new
-    @stream_name = sourceconfig["stream"]
-    @offset = sourceconfig["offset"]
-    @shard = sourceconfig["shard"]
+    @stream_name = sourceconfig["stream"].to_s
+    @offset = sourceconfig["offset"].to_s
+    @shard = sourceconfig["shard"].to_s
+
+    log "Getting shard iterator for stream #{@stream_name}, shard #{@shard} with offset #{@offset}"
+
     @fetch_size = 20
 
-    if @offset == 0
+    if @offset == "0"
       @shard_iter = @_kinesis.get_shard_iterator(:stream_name => @stream_name, :shard_id => @shard, :shard_iterator_type => "LATEST")
     else
-      @shard_iter = @_kinesis.get_shard_iterator(:stream_name => @stream_name, :shard_id => @shard, :shard_iterator_type => "AFTER_SEQUENCE_NUMBER", :starting_sequence_number => @offset)
+      @shard_iter = @_kinesis.get_shard_iterator(:stream_name => @stream_name, :shard_id => @shard, :shard_iterator_type => "AFTER_SEQUENCE_NUMBER", :starting_sequence_number => @offset.to_i)
     end
 
-    @path = "/tmp/" + @stream_name + @shard + @offset
+    @path = "/tmp/" + @stream_name + @shard + @offset + ".gz"
     log "Writing to path: #{@path}"
-
+    sleep 5
   end
 
   def get_data
@@ -184,11 +188,18 @@ class KinesisSource < KafkaSource
       log "opening path: " + @path
       File.open(@path, 'wb') do |file|
         results = @_kinesis.get_records(:shard_iterator => @shard_iter.shard_iterator, :limit => @fetch_size)
+        log "Retreived #{results.records.length} records for #{@shard} shard" 
+        gz = Zlib::GzipWriter.new(file)
         results.records.each do |record|
-          file.write(record.data)
-          file.write("\n")
+          #file.write(record.data)
+          #file.write("\n")
+          #gz = Zlib::GzipWriter.new(file)
+          gz.write record.data.to_s
+          #gz.close
+          log "data written"
           @_sqnum = record.sequence_number
         end
+        gz.close
         log "Retreived #{results.records.length} records for #{@shard} shard"
       end
     rescue Exception => e
@@ -201,8 +212,8 @@ class KinesisSource < KafkaSource
 
   def push_next(topic, type, work_q, q_offset)
     
-    config = {:stream => @stream_name, :shard => @shard}
-    source = {:type => @type, :config => config, :offset => @_sqnum}
+    config = {:stream => @stream_name, :shard => @shard, :offset => @_sqnum}
+    source = {:type => @type, :config => config}
     info = {:source => source, :topic => topic}.to_json
     message = JSON.parse(info)
     sToPush = {:message => message, :offset => q_offset}

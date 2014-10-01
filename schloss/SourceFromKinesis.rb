@@ -5,23 +5,24 @@ require "json"
 class SourceFromKinesis
   
 
-  def initialize(message, logfile)
+  def initialize(message, logfile, credentials="TODO")
 
     AWS.config(
           :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
           :secret_access_key => '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'
           )
 
-    @_s3 = AWS::S3.new
+    @_kinesis = AWS::Kinesis::Client.new
     @local_manifest = nil
     @logfile = logfile
+    @shardIDs = []
 
-    @bucket_name = message["source"]["config"]["bucket"]
-    @manifest_path = message["source"]["config"]["manifest"]
+    @stream_name = message["source"]["config"]["stream"]
+
     @topic_to_write = message["topic"]
     @sourcetype = message["source"]["type"]
-    @bucket = @_s3.buckets[@bucket_name]
-    log "Downloading Manifest from #{@manifest_path} for topic: #{@topic_to_write} in bucket: #{@bucket_name}"
+
+    log "Downloading Kinesis Manifest from #{@stream_name} for topic: #{@topic_to_write} in bucket: #{@bucket_name}"
   end      
 
   def log(msg)
@@ -32,24 +33,31 @@ class SourceFromKinesis
     @lf.write "#{Time.now}: #{msg}\n"
     @lf.flush
   end
+
   def write_to_manifest(manifest)
     @local_manifest = manifest
+    
+    @_kinesis.describe_stream(:stream_name => @stream_name).stream_description.shards.each do |shard|
+      log shard.shard_id
+      @shardIDs << shard.shard_id
+    end
 
     File.open(@local_manifest, 'wb') do |file|
       log "Opened file: #{file}"
-      @bucket.objects[@manifest_path].read do |chunk|
+      @shardIDs do |shard|
         begin
-          file.write(chunk)
+          file.write(shard)
+          file.write("\n")
         rescue
-          log "s3 error for path: #{f}"
+          log "kinesis error for path: #{file}"
         end
       end
     end
   end
 
   def parse(line)
-    config = {:bucket => @bucket_name, :shard => line.chomp}
-    source = {:type => @sourcetype, :config => config}
+    config = {:stream => @stream_name, :shard => line.chomp}
+    source = {:type => @sourcetype, :config => config, :offset => 0}
     return source
   end
 

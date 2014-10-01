@@ -189,9 +189,10 @@ class KinesisSource < KafkaSource
           file.write("\n")
           @_sqnum = record.sequence_number
         end
+        log "Retreived #{results.records.length} records for #{@shard} shard"
       end
     rescue Exception => e
-      log "Shard error: #{e.message} for path #{f}"
+      log "Shard error: #{e.message} for path #{@shard}"
       # TODO Retry
     end
     

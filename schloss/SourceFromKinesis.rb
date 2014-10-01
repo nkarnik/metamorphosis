@@ -44,7 +44,7 @@ class SourceFromKinesis
 
     File.open(@local_manifest, 'wb') do |file|
       log "Opened file: #{file}"
-      @shardIDs do |shard|
+      @shardIDs.each do |shard|
         begin
           file.write(shard)
           file.write("\n")

@@ -3,6 +3,8 @@ require "thread"
 require "json"
 require "poseidon"
 require "logger"
+require "./SourceFromS3.rb"
+require "./SourceFromKinesis.rb"
 
 require_relative "../common/kafka_utils.rb"
 
@@ -76,33 +78,40 @@ class SourceManager
             message = JSON.parse(message)
             log "Processing  message: #{message}"
       
-            bucket_name = message["source"]["config"]["bucket"]
-            manifest_path = message["source"]["config"]["manifest"]
+            #bucket_name = message["source"]["config"]["bucket"]
+            #manifest_path = message["source"]["config"]["manifest"]
             topic_to_write = message["topic"]
             sourcetype = message["source"]["type"]
-            bucket = @_s3.buckets[bucket_name]
-            log "Downloading Manifest from #{manifest_path} for topic: #{topic_to_write} in bucket: #{bucket_name}"
-            
-            # If source type is s3 ... needed classes for this
-            File.open(@local_manifest, 'wb') do |file|
-              log "Opened file: #{file}"
-              bucket.objects[manifest_path].read do |chunk|
-                begin
-                  file.write(chunk)
-                rescue
-                  log "s3 error for path: #{f}"
-                end
-              end
-            end
+
+            @source = create_source(message, @logfile)
+            @source.write_to_manifest(@local_manifest)
+
+            #bucket = @_s3.buckets[bucket_name]
+            #log "Downloading Manifest from #{manifest_path} for topic: #{topic_to_write} in bucket: #{bucket_name}"
+            #
+            ## If source type is s3 ... needed classes for this
+            #File.open(@local_manifest, 'wb') do |file|
+            #  log "Opened file: #{file}"
+            #  bucket.objects[manifest_path].read do |chunk|
+            #    begin
+            #      file.write(chunk)
+            #    rescue
+            #      log "s3 error for path: #{f}"
+            #    end
+            #  end
+            #end
             # log "Manifest length: #{`wc -l #{local_manifest}`}"
             hosts = @fqdns.length
             log "Hosts #{hosts}"
             lines_consumed = 0
             File.open(@local_manifest).each do |line|
-              config = {:bucket => bucket_name, :shard => line.chomp}
-              source = {:type => sourcetype, :config => config}
-              info = {:source => source, :topic => topic_to_write}.to_json
-              hostnum = lines_consumed % hosts
+              #config = {:bucket => bucket_name, :shard => line.chomp}
+              #source = {:type => sourcetype, :config => config}
+
+              sourceinfo = @source.parse(line)
+              info = {:source => sourceinfo, :topic => topic_to_write}.to_json
+              #info = {:source => source, :topic => topic_to_write}.to_json
+              hostnum = @messages_consumed % hosts
               broker_topic = @queues[hostnum]
               msgs = []
               log "Writing to topic: #{broker_topic} message: #{info}"
@@ -138,4 +147,17 @@ class SourceManager
       log "error somewhere"
     end
   end
+
+  def create_source(message, logfile)
+
+    sourcetype = message["source"]["type"]
+    if (sourcetype == "s3")
+      return SourceFromS3.new(message, logfile)
+    elsif (sourcetype == "kinesis")
+      return SourceFromKinesis.new(message, logfile)
+    end
+
+  end
+
+
 end

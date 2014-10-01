@@ -30,7 +30,7 @@ loop do
   kClient.put_record(:stream_name => "TestStream", :data => data, :partition_key => partition)
   puts data, partition
 
-  sleep 1 
+  sleep 0.1 
 
 end
 

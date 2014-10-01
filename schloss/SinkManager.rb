@@ -9,12 +9,13 @@ require_relative "../common/kafka_utils.rb"
 class SinkManager
   
   attr_reader :sinkTopic, :thread
-  def initialize(sinktopic, logfile, fqdns)
+  def initialize(sinktopic, logfile, fqdns, queues=[])
     @sinkTopic = sinktopic
     @thread = nil
     @logfile = logfile
     @sinkConsumer = nil
     @fqdns = fqdns
+    @sinkQueues = queues
 
     leaders_per_partition = get_leaders_for_partitions(@sinkTopic, @fqdns)
 

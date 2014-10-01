@@ -35,10 +35,15 @@ class ProducerThread
     if @sourcetype == "s3"
       source = S3Source.new(@sourceconfig, @logfile)
       return source
+
+    elsif @sourcetype == "kinesis"
+      source = KinesisSource.new(@sourceconfig, @logfile, @work_q)
+      return source
     end
   end
 
   def start(work_q, topic_producer_hash)
+    @work_q = work_q
     @thread = Thread.new do
       num_msgs_per_thread = 0
       begin
@@ -47,7 +52,11 @@ class ProducerThread
         # log "producer: #{producer} for node: #{producer_fqdn}"
         log "Number of shards left to push into kafka: " + work_q.size.to_s
 
-        while s = work_q.pop(true)
+        while i = work_q.pop(true)
+          s = i[:message]
+          offset = i[:offset]
+          log "Popped message with offset #{offset}"
+          `echo #{offset} > offset#{@thread_num}`
           log "Queue size is #{work_q.size} with num: #{work_q.num}, and this many queues: #{work_q.queues.length} with info #{work_q.info}"
           @sourcetype = s["source"]["type"]
           @sourceconfig = s["source"]["config"]
@@ -69,6 +78,9 @@ class ProducerThread
             log "Failed data read. Moving on: #{path}"
             next
           end
+
+          # Only does work for certain types of source (e.g. Kinesis)
+          @source.push_next(@topic, @sourcetype, work_q, offset)
 
           #Select partition by sampling
           partition = partitions_for_thread.sample
@@ -139,14 +151,75 @@ end
 
 class KinesisSource < KafkaSource
 
-  def initialize(sourceconfig, logfile)
-    return
+  attr_reader :path
+  def initialize(sourceconfig, logfile, work_q = [])
+    AWS.config(
+              :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
+              :secret_access_key => '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'
+              )
+
+    @logfile = logfile
+    log "Creating kinesis source"
+ 
+    @_kinesis = AWS::Kinesis::Client.new
+    @stream_name = sourceconfig["stream"].to_s
+    @offset = sourceconfig["offset"].to_s
+    @shard = sourceconfig["shard"].to_s
+
+    log "Getting shard iterator for stream #{@stream_name}, shard #{@shard} with offset #{@offset}"
+
+    @fetch_size = 20
+
+    if @offset == "0"
+      @shard_iter = @_kinesis.get_shard_iterator(:stream_name => @stream_name, :shard_id => @shard, :shard_iterator_type => "LATEST")
+    else
+      @shard_iter = @_kinesis.get_shard_iterator(:stream_name => @stream_name, :shard_id => @shard, :shard_iterator_type => "AFTER_SEQUENCE_NUMBER", :starting_sequence_number => @offset.to_i)
+    end
+
+    @path = "/tmp/" + @stream_name + @shard + @offset + ".gz"
+    log "Writing to path: #{@path}"
+    sleep 5
   end
 
   def get_data
-    return
+    log "getting data"
+    @_sqnum = @offset
+    begin
+      log "opening path: " + @path
+      File.open(@path, 'wb') do |file|
+        results = @_kinesis.get_records(:shard_iterator => @shard_iter.shard_iterator, :limit => @fetch_size)
+        log "Retreived #{results.records.length} records for #{@shard} shard" 
+        gz = Zlib::GzipWriter.new(file)
+        results.records.each do |record|
+          #file.write(record.data)
+          #file.write("\n")
+          #gz = Zlib::GzipWriter.new(file)
+          gz.write record.data.to_s
+          #gz.close
+          log "data written"
+          @_sqnum = record.sequence_number
+        end
+        gz.close
+        log "Retreived #{results.records.length} records for #{@shard} shard"
+      end
+    rescue Exception => e
+      log "Shard error: #{e.message} for path #{@shard}"
+      # TODO Retry
+    end
+    
+
   end
 
+  def push_next(topic, type, work_q, q_offset)
+    
+    config = {:stream => @stream_name, :shard => @shard, :offset => @_sqnum}
+    source = {:type => @type, :config => config}
+    info = {:source => source, :topic => topic}.to_json
+    message = JSON.parse(info)
+    sToPush = {:message => message, :offset => q_offset}
+    work_q.push(sToPush)
+
+  end
 end
 
 
@@ -189,4 +262,9 @@ class S3Source < KafkaSource
       # TODO Retry
     end
   end
+
+  def push_next(topic, type, work_q, q_offset)
+    return
+  end
+
 end

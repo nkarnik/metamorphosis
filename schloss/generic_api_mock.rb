@@ -54,10 +54,17 @@ while true do
 
   puts "Enter type topic bucket manifest_path:"
   raw = gets.chomp().split(" ")
-  config = {:bucket => raw[2], :manifest => raw[3]}
-  source = {:type => raw[0], :config => config}
-  message = {:source => source, :topic => raw[1]}.to_json
+  
+  if raw[0] == "s3"
+    config = {:bucket => raw[2], :manifest => raw[3]}
+    source = {:type => raw[0], :config => config}
+    message = {:source => source, :topic => raw[1]}.to_json
 
+  elsif raw[0] == "kinesis"
+    config = {:stream => raw[2]}
+    source = {:type => raw[0], :config => config}
+    message = {:source => source, :topic => raw[1]}.to_json
+  end
 
   messages = []
   messages << Poseidon::MessageToSend.new(topic, message)

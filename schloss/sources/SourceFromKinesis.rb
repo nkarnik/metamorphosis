@@ -1,11 +1,18 @@
 require "aws-sdk"
 require "poseidon"
 require "json"
+require 'logger'
+
+require_relative "../logging.rb"
+module Metamorphosis
+module Schloss
+  include Logging
 
 class SourceFromKinesis
   
 
-  def initialize(message, logfile, credentials="TODO")
+  def initialize(message, credentials="TODO")
+
 
     AWS.config(
           :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
@@ -14,7 +21,6 @@ class SourceFromKinesis
 
     @_kinesis = AWS::Kinesis::Client.new
     @local_manifest = nil
-    @logfile = logfile
     @shardIDs = []
 
     @stream_name = message["source"]["config"]["stream"]
@@ -22,34 +28,25 @@ class SourceFromKinesis
     @topic_to_write = message["topic"]
     @sourcetype = message["source"]["type"]
 
-    log "Downloading Kinesis Manifest from #{@stream_name} for topic: #{@topic_to_write} in bucket: #{@bucket_name}"
+    info "Downloading Kinesis Manifest from #{@stream_name} for topic: #{@topic_to_write} in bucket: #{@bucket_name}"
   end      
-
-  def log(msg)
-    if @lf.nil?
-      @lf = File.open(@logfile, 'a')
-    end
-    puts "#{Time.now}: #{msg}\n"
-    @lf.write "#{Time.now}: #{msg}\n"
-    @lf.flush
-  end
 
   def write_to_manifest(manifest)
     @local_manifest = manifest
     
     @_kinesis.describe_stream(:stream_name => @stream_name).stream_description.shards.each do |shard|
-      log shard.shard_id
+      info shard.shard_id
       @shardIDs << shard.shard_id
     end
 
     File.open(@local_manifest, 'wb') do |file|
-      log "Opened file: #{file}"
+      info "Opened file: #{file}"
       @shardIDs.each do |shard|
         begin
           file.write(shard)
           file.write("\n")
         rescue
-          log "kinesis error for path: #{file}"
+          error "kinesis error for path: #{file}"
         end
       end
     end
@@ -61,4 +58,6 @@ class SourceFromKinesis
     return source
   end
 
+end
+end
 end

@@ -4,72 +4,20 @@ require "json"
 require "poseidon"
 require "logger"
 
-require_relative "../common/kafka_utils.rb"
-
-class SinkManager
-  
-  attr_reader :sinkTopic, :thread
-  def initialize(sinktopic, logfile, fqdns, queues=[])
-    @sinkTopic = sinktopic
-    @thread = nil
-    @logfile = logfile
-    @sinkConsumer = nil
-    @fqdns = fqdns
-    @sinkQueues = queues
-
-    leaders_per_partition = get_leaders_for_partitions(@sinkTopic, @fqdns)
-
-    leader = leaders_per_partition.first
-    log "Leader: #{leader}"
-
-    @sinkConsumer = Poseidon::PartitionConsumer.new(@sinkTopic, leader.split(":").first, leader.split(":").last, queue_name, 0, :earliest_offset)
-
-    log "Consumer : #{@sinkConsumer}"
-
-
-  end
-
-  def start()
-    @thread = Thread.new do
-      loop do
-        begin
-          log "Getting message now... consumer: #{@consumer}"
-          messages = @sinkConsumer.fetch({:max_bytes => 1000000})
-      
-          log "Messages received: #{messages}"
-          log "#{messages.length} messages received"
-          messages.each do |m|
-            message = m.value
-            message = JSON.parse(message)
-            topic = message["topic"]
-            bucket = message["bucket"]
-            key = message["key"]
-            sink = Sink.new(topic, @fqdns, bucket, key, @logfile)
-            sink.start()
-          end
-        rescue Exception => e
-          log "ERROR: #{e.message}"
-
-        end
-
-
-      end
-    end
-  end
-end
-
+require_relative "../logging.rb"
 #sinks to S3
+module Metamorphosis
+module Schloss
 class Sink
 
   attr_reader :topic
-  def initialize(topic, fqdns, bucket, key, logfile)
+  def initialize(topic, fqdns, bucket, key)
 
     AWS.config(
                :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
                :secret_access_key => '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'
                ) 
 
-    @logfile = logfile
     @_key = key
     @topic = topic
     @thread = nil
@@ -77,11 +25,11 @@ class Sink
     
     leaders_per_partition = get_leaders_for_partitions(@topic, fqdns)
     leader = leaders_per_partition.first
-    log "Leader: #{leader}"
+    info "Leader: #{leader}"
 
     @consumer = Poseidon::PartitionConsumer.new(@topic, leader.split(":").first, leader.split(":").last, queue_name, 0, :earliest_offset)
 
-    log "Consumer : #{@consumer}"
+    info "Consumer : #{@consumer}"
 
     @_s3 = AWS::S3.new
     @_bucket = @_s3.buckets[bucket] 
@@ -94,13 +42,13 @@ class Sink
       #read from topic and sink
       loop do
         begin
-          log "Getting message now... consumer: #{@consumer}"
+          info "Getting message now... consumer: #{@consumer}"
           
           #TODO set batch size for max_bytes
           messages = @consumer.fetch({:max_bytes => 1000000})
       
-          log "Messages received: #{messages}"
-          log "#{messages.length} messages received"
+          info "Messages received: #{messages}"
+          info "#{messages.length} messages received"
           msgsToSink = []
           messages.each do |m|
             message = m.value
@@ -111,7 +59,7 @@ class Sink
           sink(msgsToSink)
 
         rescue Exception => e
-          log "ERROR: #{e.message}"
+          error "ERROR: #{e.message}"
         end
 
       end
@@ -140,13 +88,12 @@ class Sink
       File.delete @path
       @shardNum += 1
 
-    rescue
-      log "S3 shard upload error"
+    rescue Exception => e
+      error "S3 shard upload error: #{e.message}"
 
     end
 
   end
 end
-
-
-
+end
+end

@@ -2,6 +2,9 @@
 class TopicProducerConfig
   attr_reader :leaders_per_partition, :partitions_on_localhost, :producer_hash
   def initialize(broker_pool, topic)
+    @log = Logger.new('| tee shard_producer.log', 10, 1024000)
+    @log.datetime_format = '%Y-%m-%d %H:%M:%S'
+
     cluster_metadata = Poseidon::ClusterMetadata.new
     cluster_metadata.update(broker_pool.fetch_metadata([topic]))
     metadata = cluster_metadata.topic_metadata[topic]
@@ -13,7 +16,7 @@ class TopicProducerConfig
       @leaders_per_partition << "#{h.host}:#{h.port}"
     end
 
-    log "Leaders per partition: #{leaders_per_partition}"
+    @log.info "Leaders per partition: #{leaders_per_partition}"
     partitions_per_leader = {}
     @leaders_per_partition.each_with_index do |ip, index|
       if partitions_per_leader[ip].nil?
@@ -27,10 +30,10 @@ class TopicProducerConfig
     @partitions_on_localhost = partitions_per_leader[this_host] || []
     
     if(@partitions_on_localhost.size == 0)
-      log "Partitions on localhost is null because no partitions found on #{this_host}. Using sampling instead"
+      @log.info "Partitions on localhost is null because no partitions found on #{this_host}. Using sampling instead"
       @partitions_on_localhost  = partitions_per_leader[partitions_per_leader.keys.sample]
     end
-    log "Partitions on this host: #{@partitions_on_localhost}" 
+    @log.info "Partitions on this host: #{@partitions_on_localhost}" 
 
     @producer_hash = Hash.new {|hash, partition| hash[partition] = get_producer_for_partition(partition)}
   end
@@ -43,7 +46,7 @@ class TopicProducerConfig
     else
       producer_connection_string = producer_fqdn.split(".").first.gsub("ip-", "").gsub("-",".") + ":9092"
     end
-    log "producer_connection_string for getProducerForPartition: #{producer_connection_string}"
+    @log.info "producer_connection_string for getProducerForPartition: #{producer_connection_string}"
 
     return Poseidon::Producer.new([producer_connection_string],
                                   "producer_#{partition_num}",

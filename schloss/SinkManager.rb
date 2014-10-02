@@ -6,13 +6,16 @@ require "logger"
 
 require_relative "../common/kafka_utils.rb"
 
+
 class SinkManager
   
   attr_reader :sinkTopic, :thread
-  def initialize(sinktopic, logfile, fqdns, queues=[])
+  def initialize(sinktopic, fqdns, queues=[])
+    @log = Logger.new('| tee schloss.log', 10, 1024000)
+    @log.datetime_format = '%Y-%m-%d %H:%M:%S'
+
     @sinkTopic = sinktopic
     @thread = nil
-    @logfile = logfile
     @sinkConsumer = nil
     @fqdns = fqdns
     @sinkQueues = queues
@@ -20,11 +23,11 @@ class SinkManager
     leaders_per_partition = get_leaders_for_partitions(@sinkTopic, @fqdns)
 
     leader = leaders_per_partition.first
-    log "Leader: #{leader}"
+    @log.info "Leader: #{leader}"
 
     @sinkConsumer = Poseidon::PartitionConsumer.new(@sinkTopic, leader.split(":").first, leader.split(":").last, queue_name, 0, :earliest_offset)
 
-    log "Consumer : #{@sinkConsumer}"
+    @log.info "Consumer : #{@sinkConsumer}"
 
 
   end
@@ -33,22 +36,22 @@ class SinkManager
     @thread = Thread.new do
       loop do
         begin
-          log "Getting message now... consumer: #{@consumer}"
+          @log.info "Getting message now... consumer: #{@consumer}"
           messages = @sinkConsumer.fetch({:max_bytes => 1000000})
       
-          log "Messages received: #{messages}"
-          log "#{messages.length} messages received"
+          @log.info "Messages received: #{messages}"
+          @log.info "#{messages.length} messages received"
           messages.each do |m|
             message = m.value
             message = JSON.parse(message)
             topic = message["topic"]
             bucket = message["bucket"]
             key = message["key"]
-            sink = Sink.new(topic, @fqdns, bucket, key, @logfile)
+            sink = Sink.new(topic, @fqdns, bucket, key)
             sink.start()
           end
         rescue Exception => e
-          log "ERROR: #{e.message}"
+          @log.info "ERROR: #{e.message}"
 
         end
 
@@ -62,14 +65,14 @@ end
 class Sink
 
   attr_reader :topic
-  def initialize(topic, fqdns, bucket, key, logfile)
-
+  def initialize(topic, fqdns, bucket, key)
+    @log = Logger.new('| tee schloss.log', 10, 1024000)
+    @log.datetime_format = '%Y-%m-%d %H:%M:%S'
     AWS.config(
                :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
                :secret_access_key => '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'
                ) 
 
-    @logfile = logfile
     @_key = key
     @topic = topic
     @thread = nil
@@ -77,11 +80,11 @@ class Sink
     
     leaders_per_partition = get_leaders_for_partitions(@topic, fqdns)
     leader = leaders_per_partition.first
-    log "Leader: #{leader}"
+    @log.info "Leader: #{leader}"
 
     @consumer = Poseidon::PartitionConsumer.new(@topic, leader.split(":").first, leader.split(":").last, queue_name, 0, :earliest_offset)
 
-    log "Consumer : #{@consumer}"
+    @log.info "Consumer : #{@consumer}"
 
     @_s3 = AWS::S3.new
     @_bucket = @_s3.buckets[bucket] 
@@ -94,13 +97,13 @@ class Sink
       #read from topic and sink
       loop do
         begin
-          log "Getting message now... consumer: #{@consumer}"
+          @log.info "Getting message now... consumer: #{@consumer}"
           
           #TODO set batch size for max_bytes
           messages = @consumer.fetch({:max_bytes => 1000000})
       
-          log "Messages received: #{messages}"
-          log "#{messages.length} messages received"
+          @log.info "Messages received: #{messages}"
+          @log.info "#{messages.length} messages received"
           msgsToSink = []
           messages.each do |m|
             message = m.value
@@ -111,7 +114,7 @@ class Sink
           sink(msgsToSink)
 
         rescue Exception => e
-          log "ERROR: #{e.message}"
+          @log.error "ERROR: #{e.message}"
         end
 
       end
@@ -140,8 +143,8 @@ class Sink
       File.delete @path
       @shardNum += 1
 
-    rescue
-      log "S3 shard upload error"
+    rescue Exception => e
+      @log.error "S3 shard upload error: #{e.message}"
 
     end
 

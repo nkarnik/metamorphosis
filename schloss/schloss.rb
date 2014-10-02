@@ -3,24 +3,16 @@ require 'thread'
 require "aws-sdk"
 require "poseidon"
 require "optparse"
+require 'logger'
 require "./SinkManager.rb"
 require "./SourceManager.rb"
 
 require_relative("../common/kafka_utils.rb")
 
-LOGFILE = "kafka_consumer.log"
-`touch #{LOGFILE}`
+log = Logger.new('| tee schloss.log', 10, 1024000)
+log.datetime_format = '%Y-%m-%d %H:%M:%S'
 
-def log(msg)
-  if @lf.nil?
-    @lf = File.open(LOGFILE, 'a')
-  end
-  puts "#{Time.now}: #{msg}\n"
-  @lf.write "#{Time.now}: #{msg}\n"
-  @lf.flush
-end
-
-log "Starting read_api"
+log.info "Starting schloss"
 
 AWS.config(
           :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
@@ -77,7 +69,7 @@ if env == "local"
 else
   fqdns = find_broker(env)
 end
-log "fqdns: #{fqdns}"
+log.info "fqdns: #{fqdns}"
 
 begin
   queues = $options[:queues].split(",")
@@ -85,17 +77,17 @@ rescue
   queues = fqdns.map{|n| n.split(":").first}
 end
 
-log "fqdns: #{fqdns}"
+log.info "fqdns: #{fqdns}"
 if queues.size != fqdns.size
-  log "ERROR: Number of queues does not match brokers: Qs: #{queues} vs Broker fqdns: #{fqdns}"
+  log.error "ERROR: Number of queues does not match brokers: Qs: #{queues} vs Broker fqdns: #{fqdns}"
   exit
 end
 
 # fqdns[hostnum].split(":").first
-log "Config:\nenv: #{env}\nsourceTopic: #{sourceTopic}\nbrokers: #{brokers}\nruns: #{total_runs}\nqueues: #{queues}"
+log.info "Config:\nenv: #{env}\nsourceTopic: #{sourceTopic}\nbrokers: #{brokers}\nruns: #{total_runs}\nqueues: #{queues}"
 
 # Start SourceManager
-sourceManager = SourceManager.new(sourceTopic, LOGFILE, fqdns, total_runs, queues, offset)
+sourceManager = SourceManager.new(sourceTopic, fqdns, total_runs, queues, offset)
 sourceManager.start()
 
 # Start Sinker

@@ -9,35 +9,28 @@ require_relative "../../common/kafka_utils.rb"
 
 class ProducerThread
   attr_reader :thread, :sourcetype, :sourceconfig, :source, :topic
-  def initialize(logfile, num_threads, thread_num, start_time)
+  def initialize(num_threads, thread_num, start_time)
+    @log = Logger.new('| tee shard_producer.log', 10, 1024000)
+    @log.datetime_format = '%Y-%m-%d %H:%M:%S'
+
     @start_time = start_time
     @sourcetype = nil
     @sourceconfig = nil
     @source = nil
     @topic = nil
     @thread = nil
-    @logfile = logfile
     @num_threads = num_threads
     @thread_num = thread_num
 
   end
 
-  def log(msg)
-    if @lf.nil?
-      @lf = File.open(@logfile, 'a')
-    end
-    puts "#{Time.now}: #{msg}\n"
-    @lf.write "#{Time.now}: #{msg}\n"
-    @lf.flush
-  end
-
   def createSource()
     if @sourcetype == "s3"
-      source = S3Source.new(@sourceconfig, @logfile)
+      source = S3Source.new(@sourceconfig)
       return source
 
     elsif @sourcetype == "kinesis"
-      source = KinesisSource.new(@sourceconfig, @logfile, @work_q)
+      source = KinesisSource.new(@sourceconfig, @work_q)
       return source
     end
   end
@@ -49,23 +42,25 @@ class ProducerThread
       begin
         # We want producers exclusive to threads.
         # producers_for_thread = @producers.select.with_index{|_,i| i % num_threads == thread_num}
-        # log "producer: #{producer} for node: #{producer_fqdn}"
-        log "Number of shards left to push into kafka: " + work_q.size.to_s
+        # @log.info "producer: #{producer} for node: #{producer_fqdn}"
+        @log.info "Number of shards left to push into kafka: " + work_q.size.to_s
 
-        while i = work_q.pop(true)
-          s = i[:message]
-          offset = i[:offset]
-          log "Popped message with offset #{offset}"
+        while message_and_offset = work_q.pop(true)
+          message = message_and_offset[:message]
+          offset = message_and_offset[:offset]
+          @log.info "Popped message with offset #{offset}"
           `echo #{offset} > offset#{@thread_num}`
-          log "Queue size is #{work_q.size} with num: #{work_q.num}, and this many queues: #{work_q.queues.length} with info #{work_q.info}"
-          @sourcetype = s["source"]["type"]
-          @sourceconfig = s["source"]["config"]
+          @log.info "Queue size is #{work_q.size} with num: #{work_q.num}, and this many queues: #{work_q.queues.length} with info #{work_q.info}"
+          @sourcetype = message["source"]["type"]
+          @sourceconfig = message["source"]["config"]
           @source = createSource()
-          @topic = s["topic"]
-          log "Source config: #{@sourceconfig}\nSource type: #{@sourcetype}\nTopic: #{@topic}"
+          @topic = message["topic"]
+          @log.info "Source config: #{@sourceconfig}"
+          @log.info " Source type: #{@sourcetype}"
+          @log.info " Topic: #{@topic}"
 
           topicproducer = topic_producer_hash[@topic]
-          partitions_for_thread = topicproducer.partitions_on_localhost.select.with_index{|_,i| i % @num_threads == @thread_num}
+          partitions_for_thread = topicproducer.partitions_on_localhost.select.with_index{|_,partition_num| partition_num % @num_threads == @thread_num}
 
           #Get path of file where data is written to locally, and write data there
           #If the data doesn't write then exit
@@ -75,7 +70,7 @@ class ProducerThread
           begin
             @source.get_data
           rescue Exception => e
-            log "Failed data read. Moving on: #{path}"
+            @log.info "Failed data read. Moving on: #{path}"
             next
           end
 
@@ -87,7 +82,7 @@ class ProducerThread
           producer = topicproducer.get_producer_for_partition(partition)
 
           datafile = open(path)
-          log "Downloaded: #{path} in #{Time.now - per_shard_time}"
+          @log.info "Downloaded: #{path} in #{Time.now - per_shard_time}"
           gz = Zlib::GzipReader.new(datafile)
           msgs = []
           sent_messages = 0
@@ -98,14 +93,14 @@ class ProducerThread
               # producer.send_messages([Poseidon::MessageToSend.new(topic, line)])
               # binding.pry
             rescue Exception => e
-              log "Error: #{e.message}"
+              @log.info "Error: #{e.message}"
             end
           end
           if producer.send_messages(msgs)
             sent_messages += msgs.size
             num_msgs_per_thread += sent_messages
           else
-            log "Message failed: Batch size #{msgs.size} Sent from this shard: #{sent_messages}"
+            @log.info "Message failed: Batch size #{msgs.size} Sent from this shard: #{sent_messages}"
           end
 
           # binding.pry
@@ -113,11 +108,15 @@ class ProducerThread
           # producer.send_messages(msgs)
           File.delete path
           #shard_num += 1
-          log( "#T: #{@thread_num} P#: #{partition}\t #{(Time.now - per_shard_time).round(2)}s \t#{num_msgs_per_thread} msgs. #{path.gsub("/tmp/", "")} \tshard: #{} \tRem:#{work_q.size}.  since: #{((Time.now - @start_time) / 60.0).round(2)} min")
+          @log.info( "#T: #{@thread_num} P#: #{partition}\t #{(Time.now - per_shard_time).round(2)}s \t#{num_msgs_per_thread} msgs. #{path.gsub("/tmp/", "")} \tshard: #{} \tRem:#{work_q.size}.  since: #{((Time.now - @start_time) / 60.0).round(2)} min")
         end
       rescue SystemExit, Interrupt, Exception => te
-        log "Thread Completed: #{te.message}.\n\n\tTotal Messages for this thread: #{num_msgs_per_thread}\n\n"
-        puts te.backtrace #unless te.message.include?("queue empty")
+        @log.info "Thread Completed: #{te.message}."
+        @log.info " "
+        @log.info " \tTotal Messages for this thread: #{num_msgs_per_thread}"
+        @log.info " "
+        @log.info " "
+        @log.error te.backtrace unless te.message.include?("queue empty")
         Thread.exit
       end
     end
@@ -126,24 +125,13 @@ end
 
 class KafkaSource
 
-  def initialize(sourceconfig, logfile)
+  def initialize(sourceconfig)
     #validate input of
-
-    @logfile = logfile
-
-  end
-
-  def log(msg)
-    if @lf.nil?
-      @lf = File.open(@logfile, 'a')
-    end
-    puts "#{Time.now}: #{msg}\n"
-    @lf.write "#{Time.now}: #{msg}\n"
-    @lf.flush
+    @log = Logger.new('| tee shard_producer.log', 10, 1024000)
+    @log.datetime_format = '%Y-%m-%d %H:%M:%S'
   end
 
   def get_data
-    puts @logfile
     #do some generic stuff
   end
 
@@ -152,21 +140,23 @@ end
 class KinesisSource < KafkaSource
 
   attr_reader :path
-  def initialize(sourceconfig, logfile, work_q = [])
+  def initialize(sourceconfig, work_q = [])
+    @log = Logger.new('| tee shard_producer.log', 10, 1024000)
+    @log.datetime_format = '%Y-%m-%d %H:%M:%S'
+
     AWS.config(
               :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
               :secret_access_key => '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'
               )
 
-    @logfile = logfile
-    log "Creating kinesis source"
+    @log.info "Creating kinesis source"
  
     @_kinesis = AWS::Kinesis::Client.new
     @stream_name = sourceconfig["stream"].to_s
     @offset = sourceconfig["offset"].to_s
     @shard = sourceconfig["shard"].to_s
 
-    log "Getting shard iterator for stream #{@stream_name}, shard #{@shard} with offset #{@offset}"
+    @log.info "Getting shard iterator for stream #{@stream_name}, shard #{@shard} with offset #{@offset}"
 
     @fetch_size = 20
 
@@ -177,18 +167,17 @@ class KinesisSource < KafkaSource
     end
 
     @path = "/tmp/" + @stream_name + @shard + @offset + ".gz"
-    log "Writing to path: #{@path}"
-    sleep 5
+    @log.info "Writing to path: #{@path}"
   end
 
   def get_data
-    log "getting data"
+    @log.info "getting data"
     @_sqnum = @offset
     begin
-      log "opening path: " + @path
+      @log.info "opening path: " + @path
       File.open(@path, 'wb') do |file|
         results = @_kinesis.get_records(:shard_iterator => @shard_iter.shard_iterator, :limit => @fetch_size)
-        log "Retreived #{results.records.length} records for #{@shard} shard" 
+        @log.info "Retreived #{results.records.length} records for #{@shard} shard" 
         gz = Zlib::GzipWriter.new(file)
         results.records.each do |record|
           #file.write(record.data)
@@ -196,14 +185,14 @@ class KinesisSource < KafkaSource
           #gz = Zlib::GzipWriter.new(file)
           gz.write record.data.to_s
           #gz.close
-          log "data written"
+          @log.info "data written"
           @_sqnum = record.sequence_number
         end
         gz.close
-        log "Retreived #{results.records.length} records for #{@shard} shard"
+        @log.info "Retreived #{results.records.length} records for #{@shard} shard"
       end
     rescue Exception => e
-      log "Shard error: #{e.message} for path #{@shard}"
+      @log.error "Shard error: #{e.message} for path #{@shard}"
       # TODO Retry
     end
     
@@ -226,39 +215,41 @@ end
 
 class S3Source < KafkaSource
   attr_reader :path
-  def initialize(sourceconfig, logfile)
+  def initialize(sourceconfig)
+    @log = Logger.new('| tee shard_producer.log', 10, 1024000)
+    @log.datetime_format = '%Y-%m-%d %H:%M:%S'
+
     AWS.config(
               :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
               :secret_access_key => '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'
               )
 
-    @logfile = logfile
     @_s3 = AWS::S3.new
     @_bucket = @_s3.buckets[sourceconfig["bucket"]]
 
     @f = sourceconfig["shard"].chomp.gsub("s3://#{sourceconfig["bucket"]}/", "")
-    log "Preparing shard #{@f}"
+    @log.info "Preparing shard #{@f}"
     per_shard_time = Time.now
     @path = "/tmp/" + @f.split("/").last(2).join("_")
-    log @path
+    @log.info @path
   end
 
   def get_data
-    log "getting data"
+    @log.info "getting data"
 
     begin
-      log "opening path: " + @path
+      @log.info "opening path: " + @path
       File.open(@path, 'wb') do |file|
         @_bucket.objects[@f].read do |chunk|
           begin 
             file.write(chunk)
           rescue
-            log "s3 error for path: #{f}"
+            @log.info "s3 error for path: #{f}"
           end
         end
       end
     rescue Exception => e
-      log "Shard error: #{e.message} for path #{f}"
+      @log.error "Shard error: #{e.message} for path #{f}"
       # TODO Retry
     end
   end

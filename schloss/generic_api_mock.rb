@@ -5,15 +5,8 @@ require "poseidon"
 require "optparse"
 require 'pry'
 
-def log(msg)
-  if @lf.nil?
-    @lf = File.open(LOGFILE, 'a')
-  end
-  puts "#{Time.now}: #{msg}\n"
-  @lf.write "#{Time.now}: #{msg}\n"
-  @lf.flush
-end
-
+log = Logger.new('| tee schloss.log', 10, 1024000)
+log.datetime_format = '%Y-%m-%d %H:%M:%S'
 
 $options = {}
 

@@ -4,16 +4,15 @@ require "json"
 require "poseidon"
 require "logger"
 
-require_relative "../common/kafka_utils.rb"
-
-
+require_relative "../logging.rb"
+module Metamorphosis
+module Schloss
+  include Logging
 class SinkManager
   
   attr_reader :sinkTopic, :thread
   def initialize(sinktopic, fqdns, queues=[])
-    @log = Logger.new('| tee schloss.log', 10, 1024000)
-    @log.datetime_format = '%Y-%m-%d %H:%M:%S'
-
+ 
     @sinkTopic = sinktopic
     @thread = nil
     @sinkConsumer = nil
@@ -23,11 +22,11 @@ class SinkManager
     leaders_per_partition = get_leaders_for_partitions(@sinkTopic, @fqdns)
 
     leader = leaders_per_partition.first
-    @log.info "Leader: #{leader}"
+    info "Leader: #{leader}"
 
     @sinkConsumer = Poseidon::PartitionConsumer.new(@sinkTopic, leader.split(":").first, leader.split(":").last, queue_name, 0, :earliest_offset)
 
-    @log.info "Consumer : #{@sinkConsumer}"
+    info "Consumer : #{@sinkConsumer}"
 
 
   end
@@ -36,11 +35,11 @@ class SinkManager
     @thread = Thread.new do
       loop do
         begin
-          @log.info "Getting message now... consumer: #{@consumer}"
+          info "Getting message now... consumer: #{@consumer}"
           messages = @sinkConsumer.fetch({:max_bytes => 1000000})
       
-          @log.info "Messages received: #{messages}"
-          @log.info "#{messages.length} messages received"
+          info "Messages received: #{messages}"
+          info "#{messages.length} messages received"
           messages.each do |m|
             message = m.value
             message = JSON.parse(message)
@@ -51,7 +50,7 @@ class SinkManager
             sink.start()
           end
         rescue Exception => e
-          @log.info "ERROR: #{e.message}"
+          info "ERROR: #{e.message}"
 
         end
 
@@ -80,11 +79,11 @@ class Sink
     
     leaders_per_partition = get_leaders_for_partitions(@topic, fqdns)
     leader = leaders_per_partition.first
-    @log.info "Leader: #{leader}"
+    info "Leader: #{leader}"
 
     @consumer = Poseidon::PartitionConsumer.new(@topic, leader.split(":").first, leader.split(":").last, queue_name, 0, :earliest_offset)
 
-    @log.info "Consumer : #{@consumer}"
+    info "Consumer : #{@consumer}"
 
     @_s3 = AWS::S3.new
     @_bucket = @_s3.buckets[bucket] 
@@ -97,13 +96,13 @@ class Sink
       #read from topic and sink
       loop do
         begin
-          @log.info "Getting message now... consumer: #{@consumer}"
+          info "Getting message now... consumer: #{@consumer}"
           
           #TODO set batch size for max_bytes
           messages = @consumer.fetch({:max_bytes => 1000000})
       
-          @log.info "Messages received: #{messages}"
-          @log.info "#{messages.length} messages received"
+          info "Messages received: #{messages}"
+          info "#{messages.length} messages received"
           msgsToSink = []
           messages.each do |m|
             message = m.value
@@ -114,7 +113,7 @@ class Sink
           sink(msgsToSink)
 
         rescue Exception => e
-          @log.error "ERROR: #{e.message}"
+          error "ERROR: #{e.message}"
         end
 
       end
@@ -144,12 +143,13 @@ class Sink
       @shardNum += 1
 
     rescue Exception => e
-      @log.error "S3 shard upload error: #{e.message}"
+      error "S3 shard upload error: #{e.message}"
 
     end
 
   end
 end
-
+end
+end
 
 

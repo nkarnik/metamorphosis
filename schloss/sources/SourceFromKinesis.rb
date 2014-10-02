@@ -2,12 +2,17 @@ require "aws-sdk"
 require "poseidon"
 require "json"
 require 'logger'
+
+require_relative "../logging.rb"
+module Metamorphosis
+module Schloss
+  include Logging
+
 class SourceFromKinesis
   
 
   def initialize(message, credentials="TODO")
-    @log = Logger.new('| tee schloss.log', 10, 1024000)
-    @log.datetime_format = '%Y-%m-%d %H:%M:%S'
+
 
     AWS.config(
           :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
@@ -23,25 +28,25 @@ class SourceFromKinesis
     @topic_to_write = message["topic"]
     @sourcetype = message["source"]["type"]
 
-    @log.info "Downloading Kinesis Manifest from #{@stream_name} for topic: #{@topic_to_write} in bucket: #{@bucket_name}"
+    info "Downloading Kinesis Manifest from #{@stream_name} for topic: #{@topic_to_write} in bucket: #{@bucket_name}"
   end      
 
   def write_to_manifest(manifest)
     @local_manifest = manifest
     
     @_kinesis.describe_stream(:stream_name => @stream_name).stream_description.shards.each do |shard|
-      @log.info shard.shard_id
+      info shard.shard_id
       @shardIDs << shard.shard_id
     end
 
     File.open(@local_manifest, 'wb') do |file|
-      @log.info "Opened file: #{file}"
+      info "Opened file: #{file}"
       @shardIDs.each do |shard|
         begin
           file.write(shard)
           file.write("\n")
         rescue
-          @log.info "kinesis error for path: #{file}"
+          error "kinesis error for path: #{file}"
         end
       end
     end
@@ -53,4 +58,6 @@ class SourceFromKinesis
     return source
   end
 
+end
+end
 end

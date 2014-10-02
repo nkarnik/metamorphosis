@@ -3,17 +3,20 @@ require "thread"
 require "json"
 require "poseidon"
 require "logger"
-require "./SourceFromS3.rb"
-require "./SourceFromKinesis.rb"
 
-require_relative "../common/kafka_utils.rb"
+require_relative "../../common/kafka_utils.rb"
 
+require_relative "SourceFromS3.rb"
+require_relative "SourceFromKinesis.rb"
+require_relative "../logging.rb"
+
+module Metamorphosis
+module Schloss
+  include Logging
 class SourceManager
 
   attr_reader :sourceTopic, :thread
   def initialize(sourcetopic, fqdns, total_runs=0, queues, offset)
-    @log = Logger.new('| tee schloss.log', 10, 1024000)
-    @log.datetime_format = '%Y-%m-%d %H:%M:%S'
 
     AWS.config(
           :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
@@ -32,7 +35,7 @@ class SourceManager
 
     leaders_per_partition = get_leaders_for_partitions(@sourceTopic, @fqdns)
     
-    @log.info "Leaders: #{leaders_per_partition}"
+    info "Leaders: #{leaders_per_partition}"
     # Assuming one partition for this topic, find the singular leader
     leader = leaders_per_partition.first
     
@@ -50,28 +53,28 @@ class SourceManager
 
     @run_num = 0
     @messages_consumed = 0
-    @log.info "Finished Creating source manager"
+    info "Finished Creating source manager"
   end
 
   def start()
  
     begin
     @thread = Thread.new do
-      @log.info "Starting source manager"
+      info "Starting source manager"
       loop do
         begin
           messages = @sourceConsumer.fetch({:max_bytes => 100000}) # Timeout? 
           if messages.length == 0
-            @log.info "Waiting on message"
+            info "Waiting on message"
             sleep 3
             next
           end
-          @log.info " Got #{messages.length} messages and topic: #{@sourceTopic}"
-          @log.info "The next offset for the source consumer is: #{@sourceConsumer.next_offset}"
+          info " Got #{messages.length} messages and topic: #{@sourceTopic}"
+          info "The next offset for the source consumer is: #{@sourceConsumer.next_offset}"
           messages.each do |m|
             message = m.value
             message = JSON.parse(message)
-            @log.info "Processing  message: #{message}"
+            info "Processing  message: #{message}"
       
             #bucket_name = message["source"]["config"]["bucket"]
             #manifest_path = message["source"]["config"]["manifest"]
@@ -81,7 +84,7 @@ class SourceManager
             @source.write_to_manifest(@local_manifest)
 
             hosts = @fqdns.length
-            @log.info "Hosts #{hosts}"
+            info "Hosts #{hosts}"
             lines_consumed = 0
             File.open(@local_manifest).each do |line|
               #config = {:bucket => bucket_name, :shard => line.chomp}
@@ -93,37 +96,38 @@ class SourceManager
               hostnum = @messages_consumed % hosts
               broker_topic = @queues[hostnum]
               msgs = []
-              @log.info "Writing to topic: #{broker_topic} message: #{info}"
+              info "Writing to topic: #{broker_topic} message: #{info}"
               
               msgs << Poseidon::MessageToSend.new(broker_topic, info)
               unless @shardWriter.send_messages(msgs)
-                @log.info "message send error: #{broker_topic}"
+                info "message send error: #{broker_topic}"
               end
               
               lines_consumed += 1
               @messages_consumed += 1
             end
-            @log.info "Number of shards emitted into #{@sourceTopic}: #{lines_consumed}"
-            @log.info "Total # of shards into #{@sourceTopic}: #{@messages_consumed}"
+            info "Number of shards emitted into #{@sourceTopic}: #{lines_consumed}"
+            info "Total # of shards into #{@sourceTopic}: #{@messages_consumed}"
       
           end
         rescue => e
-          @log.error "ERROR: #{e.message}\n#{e.backtrace}"
+          error "ERROR: #{e.message}\n#{e.backtrace}"
         end
         
         @run_num += 1
       
         if @total_runs > 0
           if @run_num >= @total_runs
-            @log.info "Breaking because we wanted only #{@total_runs}, and completed #{@run_num} runs"
+            info "Breaking because we wanted only #{@total_runs}, and completed #{@run_num} runs"
             break
           end
         end
-        #@log.info "Looping: #{run_num}"
+        
+        #info "Looping: #{run_num}"
       end
     end
     rescue Exception => e
-      @log.error  "error :: #{e.message}"
+      error  "error :: #{e.message}"
     end
   end
 
@@ -131,12 +135,13 @@ class SourceManager
 
     sourcetype = message["source"]["type"]
     if (sourcetype == "s3")
-      return SourceFromS3.new(message)
+      return Metamorphosis::Schloss::SourceFromS3.new(message)
     elsif (sourcetype == "kinesis")
-      return SourceFromKinesis.new(message)
+      return Metamorphosis::Schloss::SourceFromKinesis.new(message)
     end
 
   end
 
-
+end
+end
 end

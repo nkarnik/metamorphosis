@@ -1,18 +1,19 @@
+#!/usr/bin/env ruby
+
 require "json"
 require 'thread'
 require "aws-sdk"
 require "poseidon"
 require "optparse"
 require 'logger'
-require "./SinkManager.rb"
-require "./SourceManager.rb"
 
+require_relative "sinks/SinkManager.rb"
+require_relative "sources/SourceManager.rb"
+require_relative "logging.rb"
 require_relative("../common/kafka_utils.rb")
 
-log = Logger.new('| tee schloss.log', 10, 1024000)
-log.datetime_format = '%Y-%m-%d %H:%M:%S'
 
-log.info "Starting schloss"
+include Metamorphosis::Schloss::Logging
 
 AWS.config(
           :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
@@ -54,6 +55,11 @@ opt_parser = OptionParser.new do |opt|
     $options[:runs] = runs
   end
 
+  opt.on("--no_recovery", "Optional, for testing, don't recover offsets") do 
+    $options[:no_recovery] = true
+  end
+
+
 end
 
 opt_parser.parse!
@@ -84,10 +90,15 @@ if queues.size != fqdns.size
 end
 
 # fqdns[hostnum].split(":").first
-log.info "Config:\nenv: #{env}\nsourceTopic: #{sourceTopic}\nbrokers: #{brokers}\nruns: #{total_runs}\nqueues: #{queues}"
+log.info "Config:"
+log.info " env: #{env}"
+log.info " sourceTopic: #{sourceTopic}"
+log.info " brokers: #{brokers}"
+log.info " runs: #{total_runs}"
+log.info " queues: #{queues}"
 
 # Start SourceManager
-sourceManager = SourceManager.new(sourceTopic, fqdns, total_runs, queues, offset)
+sourceManager = Metamorphosis::Schloss::SourceManager.new(sourceTopic, fqdns, total_runs, queues, offset)
 sourceManager.start()
 
 # Start Sinker

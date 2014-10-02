@@ -3,3 +3,4 @@ Gemfile.lock
 manifest
 *.template
 offse*
+logs

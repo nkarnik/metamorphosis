@@ -1,7 +1,12 @@
 require "thread"
+require_relative "../logging.rb"
+module Metamorphosis
+module Workers
+module Sources
+  include Logging
 
 #class that houses hash of queues
-class SourceQueue
+class RoundRobinByTopicMessageQueue
  
   attr_reader :queues, :num, :size
   def initialize
@@ -17,7 +22,6 @@ class SourceQueue
   #pushes to existing queue dedicated to topic, otherwise creates and pushes to it
   def push(message)
     found = false
-    puts "message is #{message}"
     topic = message[:message]["topic"]
     queues.each do |key, queue|
       if key == topic
@@ -48,11 +52,14 @@ class SourceQueue
     return @queues[currentQueue].pop(true)
   end
 
-  def info
+  def details
   
     currentQueue = @queues.keys[@num % @queues.length ]
     return @queues[currentQueue].size() + 1
 
   end
 
+end
+end
+end
 end

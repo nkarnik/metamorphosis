@@ -29,19 +29,24 @@ class SourceFromKinesis
       @shard_iter = @_kinesis.get_shard_iterator(:stream_name => @stream_name, :shard_id => @shard, :shard_iterator_type => "AFTER_SEQUENCE_NUMBER", :starting_sequence_number => @offset)
     end
 
-    @path = "/tmp/" + @stream_name + @shard + ".gz"
-    info "Writing to path: #{@path}"
+    @local_file_path = "/tmp/" + @stream_name + @shard + ".gz"
+    info "Writing to path: #{@local_file_path}"
 
     # NEED to sleep, otherwise we won't get any messages
     sleep 3
+  end
+
+
+  def local_file_path
+    @local_file_path
   end
 
   def get_data
     info "getting data"
     @_sqnum = @offset
     begin
-      info "opening path: " + @path
-      File.open(@path, 'wb') do |file|
+      info "opening path: " + @local_file_path
+      File.open(@local_file_path, 'wb') do |file|
         results = @_kinesis.get_records(:shard_iterator => @shard_iter.shard_iterator, :limit => @fetch_size)
         info "Retreived #{results.records.length} records for #{@shard} shard" 
         gz = Zlib::GzipWriter.new(file)

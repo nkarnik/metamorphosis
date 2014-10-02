@@ -30,7 +30,7 @@ class ProducerThread
       return source
 
     elsif @sourcetype == "kinesis"
-      source = KinesisSource.new(@sourceconfig, @work_q)
+      source = KinesisSource.new(@sourceconfig)
       return source
     end
   end
@@ -116,7 +116,7 @@ class ProducerThread
         @log.info " \tTotal Messages for this thread: #{num_msgs_per_thread}"
         @log.info " "
         @log.info " "
-        @log.error te.backtrace unless te.message.include?("queue empty")
+        @log.error "Error with thread #: #{@thread_num} with #{te.backtrace}" unless te.message.include?("queue empty")
         Thread.exit
       end
     end
@@ -140,7 +140,7 @@ end
 class KinesisSource < KafkaSource
 
   attr_reader :path
-  def initialize(sourceconfig, work_q = [])
+  def initialize(sourceconfig)
     @log = Logger.new('| tee shard_producer.log', 10, 1024000)
     @log.datetime_format = '%Y-%m-%d %H:%M:%S'
 
@@ -163,11 +163,14 @@ class KinesisSource < KafkaSource
     if @offset == "0"
       @shard_iter = @_kinesis.get_shard_iterator(:stream_name => @stream_name, :shard_id => @shard, :shard_iterator_type => "LATEST")
     else
-      @shard_iter = @_kinesis.get_shard_iterator(:stream_name => @stream_name, :shard_id => @shard, :shard_iterator_type => "AFTER_SEQUENCE_NUMBER", :starting_sequence_number => @offset.to_i)
+      @shard_iter = @_kinesis.get_shard_iterator(:stream_name => @stream_name, :shard_id => @shard, :shard_iterator_type => "AFTER_SEQUENCE_NUMBER", :starting_sequence_number => @offset)
     end
 
-    @path = "/tmp/" + @stream_name + @shard + @offset + ".gz"
+    @path = "/tmp/" + @stream_name + @shard + ".gz"
     @log.info "Writing to path: #{@path}"
+
+    # NEED to sleep, otherwise we won't get any messages
+    sleep 3
   end
 
   def get_data
@@ -180,11 +183,8 @@ class KinesisSource < KafkaSource
         @log.info "Retreived #{results.records.length} records for #{@shard} shard" 
         gz = Zlib::GzipWriter.new(file)
         results.records.each do |record|
-          #file.write(record.data)
-          #file.write("\n")
-          #gz = Zlib::GzipWriter.new(file)
           gz.write record.data.to_s
-          #gz.close
+          gz.write "\n"
           @log.info "data written"
           @_sqnum = record.sequence_number
         end
@@ -202,7 +202,7 @@ class KinesisSource < KafkaSource
   def push_next(topic, type, work_q, q_offset)
     
     config = {:stream => @stream_name, :shard => @shard, :offset => @_sqnum}
-    source = {:type => @type, :config => config}
+    source = {:type => type, :config => config}
     info = {:source => source, :topic => topic}.to_json
     message = JSON.parse(info)
     sToPush = {:message => message, :offset => q_offset}

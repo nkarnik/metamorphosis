@@ -150,10 +150,10 @@ q_thread = Thread.new{
 
 }
 
-q_thread.join
+#q_thread.join
 
 # q_thread needs time to start before worker threads can pull from $work_q
-# sleep 10
+ sleep 10
 
 start_time = Time.now
 puts "Start time: #{start_time}"

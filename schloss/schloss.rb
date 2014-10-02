@@ -1,26 +1,19 @@
+#!/usr/bin/env ruby
+
 require "json"
 require 'thread'
 require "aws-sdk"
 require "poseidon"
 require "optparse"
-require "./SinkManager.rb"
-require "./SourceManager.rb"
+require 'logger'
 
+require_relative "sinks/SinkManager.rb"
+require_relative "sources/SourceManager.rb"
+require_relative "logging.rb"
 require_relative("../common/kafka_utils.rb")
 
-LOGFILE = "kafka_consumer.log"
-`touch #{LOGFILE}`
 
-def log(msg)
-  if @lf.nil?
-    @lf = File.open(LOGFILE, 'a')
-  end
-  puts "#{Time.now}: #{msg}\n"
-  @lf.write "#{Time.now}: #{msg}\n"
-  @lf.flush
-end
-
-log "Starting read_api"
+include Metamorphosis::Schloss::Logging
 
 AWS.config(
           :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
@@ -62,6 +55,11 @@ opt_parser = OptionParser.new do |opt|
     $options[:runs] = runs
   end
 
+  opt.on("--no_recovery", "Optional, for testing, don't recover offsets") do 
+    $options[:no_recovery] = true
+  end
+
+
 end
 
 opt_parser.parse!
@@ -77,7 +75,7 @@ if env == "local"
 else
   fqdns = find_broker(env)
 end
-log "fqdns: #{fqdns}"
+log.info "fqdns: #{fqdns}"
 
 begin
   queues = $options[:queues].split(",")
@@ -85,17 +83,22 @@ rescue
   queues = fqdns.map{|n| n.split(":").first}
 end
 
-log "fqdns: #{fqdns}"
+log.info "fqdns: #{fqdns}"
 if queues.size != fqdns.size
-  log "ERROR: Number of queues does not match brokers: Qs: #{queues} vs Broker fqdns: #{fqdns}"
+  log.error "ERROR: Number of queues does not match brokers: Qs: #{queues} vs Broker fqdns: #{fqdns}"
   exit
 end
 
 # fqdns[hostnum].split(":").first
-log "Config:\nenv: #{env}\nsourceTopic: #{sourceTopic}\nbrokers: #{brokers}\nruns: #{total_runs}\nqueues: #{queues}"
+log.info "Config:"
+log.info " env: #{env}"
+log.info " sourceTopic: #{sourceTopic}"
+log.info " brokers: #{brokers}"
+log.info " runs: #{total_runs}"
+log.info " queues: #{queues}"
 
 # Start SourceManager
-sourceManager = SourceManager.new(sourceTopic, LOGFILE, fqdns, total_runs, queues, offset)
+sourceManager = Metamorphosis::Schloss::SourceManager.new(sourceTopic, fqdns, total_runs, queues, offset)
 sourceManager.start()
 
 # Start Sinker

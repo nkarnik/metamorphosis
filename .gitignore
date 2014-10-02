@@ -1,5 +1,6 @@
 Gemfile.lock
-*.log
+*.log*
 manifest
 *.template
 offse*
+logs

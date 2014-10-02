@@ -1,11 +1,17 @@
 require "aws-sdk"
 require "poseidon"
 require "json"
+require 'logger'
+
+require_relative "../logging.rb"
+module Metamorphosis
+module Schloss
+  include Logging
 
 class SourceFromS3
-  
 
-  def initialize(message, logfile)
+  def initialize(message)
+
 
     AWS.config(
           :access_key_id    => 'AKIAJWZ2I3PMFF5O6PFA',
@@ -15,36 +21,28 @@ class SourceFromS3
     @_s3 = AWS::S3.new
 
     @local_manifest = nil
-    @logfile = logfile
 
     @bucket_name = message["source"]["config"]["bucket"]
     @manifest_path = message["source"]["config"]["manifest"]
     @topic_to_write = message["topic"]
     @sourcetype = message["source"]["type"]
     @bucket = @_s3.buckets[@bucket_name]
-    log "Downloading Manifest from #{@manifest_path} for topic: #{@topic_to_write} in bucket: #{@bucket_name}"
+    info "Downloading Manifest from #{@manifest_path} for topic: #{@topic_to_write} in bucket: #{@bucket_name}"
   end      
 
-  def log(msg)
-    if @lf.nil?
-      @lf = File.open(@logfile, 'a')
-    end
-    puts "#{Time.now}: #{msg}\n"
-    @lf.write "#{Time.now}: #{msg}\n"
-    @lf.flush
-  end
 
   def write_to_manifest(manifest)
     @local_manifest = manifest
-
+    info "Writing manifest: #{manifest}"
     File.open(@local_manifest, 'wb') do |file|
-      log "Opened file: #{file}"
-      @bucket.objects[@manifest_path].read do |chunk|
-        begin
+      begin
+        @bucket.objects[@manifest_path].read do |chunk|
           file.write(chunk)
-        rescue
-          log "s3 error for path: #{f}"
         end
+      rescue => e
+        error "s3 error for path: #{f}"
+        error e.message
+        error e.backtrace
       end
     end
   end
@@ -55,4 +53,6 @@ class SourceFromS3
     return source
   end
 
+end
+end
 end

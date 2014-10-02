@@ -30,3 +30,4 @@ def gzip(string)
   w_gz.close
   return wio.string
 end
+

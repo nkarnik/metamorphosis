@@ -91,7 +91,7 @@ begin
         #data = rand(1000).to_s + "qwertywewrw"
         data = tweets[tweet_num].to_s
         data.force_encoding("iso-8859-1").encode("utf-8").encode("ASCII",:invalid => :replace, :undef => :replace, :replace => '', :universal_newline => true).gsub("\n","")
-        kClient.put_record(:stream_name => "TestStream", :data => data, :partition_key => partition)
+        kClient.put_record(:stream_name => "kinesis_demo_source", :data => data, :partition_key => partition)
         puts data, partition, tweet_num, data.class
 
         sleep 0.01

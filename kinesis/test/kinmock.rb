@@ -22,7 +22,7 @@ AWS.config(
           )
 
 kClient = AWS::Kinesis::Client.new
-testream = kClient.list_streams.stream_names[0]
+testream = kClient.list_streams.stream_names[1]
 
 #Get all shardids from stream description
 shardids = []
@@ -88,7 +88,9 @@ begin
             log "Created Shard Iterator for shard id: #{si[:sId]} with stream #{testream}"
             sleep 10
           else
-            sharditer = kClient.get_shard_iterator(:stream_name => testream, :shard_id => si[:sId], :shard_iterator_type => "AFTER_SEQUENCE_NUMBER", :starting_sequence_number => si[:sqn])
+#            sharditer = kClient.get_shard_iterator(:stream_name => testream, :shard_id => si[:sId], :shard_iterator_type => "AFTER_SEQUENCE_NUMBER", :starting_sequence_number => si[:sqn])
+            sharditer =  kClient.get_shard_iterator(:stream_name => testream, :shard_id => si[:sId], :shard_iterator_type => "LATEST")
+            sleep 10
           end
  
           records = kClient.get_records(:shard_iterator => sharditer.shard_iterator)

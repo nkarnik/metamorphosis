@@ -56,7 +56,6 @@ client.sample do |object|
 
     if object.retweet_count.to_i > 0
       puts object.text
-      sleep 3
     end
 
     tweets << tweet.to_json
@@ -88,7 +87,7 @@ begin
       tweet_num = 0
       loop do
 
-        partition = "asdfdsafdsa" + rand(50).to_s
+        partition = "asdfdsafdsa" + rand(100).to_s
         #data = rand(1000).to_s + "qwertywewrw"
         data = tweets[tweet_num].to_s
         data.force_encoding("iso-8859-1").encode("utf-8").encode("ASCII",:invalid => :replace, :undef => :replace, :replace => '', :universal_newline => true).gsub("\n","")

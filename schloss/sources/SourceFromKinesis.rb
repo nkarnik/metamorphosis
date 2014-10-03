@@ -53,8 +53,8 @@ class SourceFromKinesis
   end
 
   def parse(line)
-    config = {:stream => @stream_name, :shard => line.chomp}
-    source = {:type => @sourcetype, :config => config, :offset => 0}
+    config = {:stream => @stream_name, :shard => line.chomp, :offset => "0"}
+    source = {:type => @sourcetype, :config => config}
     return source
   end
 

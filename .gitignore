@@ -4,3 +4,8 @@ manifest
 *.template
 offse*
 logs
+/target
+bin
+*.swp
+*.class
+

@@ -1,4 +1,4 @@
-package metamorphosis.utils;
+package metamorphosis.utils.s3;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -17,7 +17,8 @@ import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import metamorphosis.utils.FileLockUtil.MultiLock;
+import metamorphosis.utils.Utils;
+import metamorphosis.utils.s3.FileLockUtil.MultiLock;
 
 import org.apache.commons.io.IOUtils;
 import org.javatuples.Pair;

@@ -5,8 +5,8 @@ import static org.junit.Assert.assertEquals;
 import java.util.ArrayList;
 import java.util.List;
 
+import metamorphosis.kafka.LocalKafkaService;
 import metamorphosis.schloss.SchlossService;
-import metamorphosis.utils.LocalKafkaService;
 import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;
 

@@ -1,4 +1,4 @@
-package metamorphosis.utils;
+package metamorphosis.utils.s3;
 
 import java.io.Serializable;
 

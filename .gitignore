@@ -5,3 +5,17 @@ manifest
 offse*
 logs
 .settings
+*.class
+*.rdb
+*.swp
+*.orig
+*.jar
+*.log
+
+*.class
+
+# Package Files #
+*.war
+*.ear
+.DS_Store
+\#*#

@@ -4,3 +4,4 @@ manifest
 *.template
 offse*
 logs
+.settings

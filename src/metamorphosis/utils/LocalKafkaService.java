@@ -41,7 +41,7 @@ import com.google.common.collect.Lists;
  * A Local Kafka Service for testing
  *
  */
-public class LocalKafkaService{
+public class LocalKafkaService implements KafkaService{
 
   private static final long serialVersionUID = -4958793274858859339L;
   private EmbeddedZookeeper _zkServer;
@@ -138,9 +138,15 @@ public class LocalKafkaService{
     // send message
     List<KeyedMessage<Integer, String>> messages = new ArrayList<>();
     messages.add(new KeyedMessage<Integer, String>(topic, message));
-    _log.info("Sending message to broker: " + message);
+    _log.info("Sending message to queue " + topic + " with message: " + message);
+    try {
     _producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
-    _producer.close();
+    //_producer.close();
+    _log.info("Successfully sent message");
+    }
+    catch (Exception e) {
+      _log.info(e.getMessage());
+    }
   }
   
   /** Send a batch of messages */

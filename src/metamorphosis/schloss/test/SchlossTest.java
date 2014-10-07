@@ -47,8 +47,8 @@ public class SchlossTest {
     .key("source").object()
         .key("type").value("s3")
         .key("config").object()
-          .key("manifest").value("path")
-          .key("bucket").value("bucket")
+          .key("manifest").value("data/homepages/20140620.manifest.debug")
+          .key("bucket").value("fatty.zillabyte.com")
           .key("credentials").object()
             .key("secret").value("")
             .key("access").value("")
@@ -63,7 +63,8 @@ public class SchlossTest {
     _localKakfaService.sendMessage(SOURCE_TOPIC, message);
     // create SchlossService
     SchlossService schlossService = new SchlossService(SOURCE_TOPIC, 
-                                                      _localKakfaService.getSeedBrokers(), 
+                                                      _localKakfaService.getSeedBrokers(),
+                                                      _localKakfaService,
                                                       _localKakfaService.getZKConnectString(), 
                                                       _workerQueues);
     // run SchlossService
@@ -71,11 +72,14 @@ public class SchlossTest {
     // verify that SchlossService fills producer_qs
     Thread.sleep(5000);
     _log.info("Reading messages for confirmation");
+    List<String> receivedMessages = new ArrayList<String>();
     for (int i = 0; i < NUM_BROKERS; i++) {
       List<String> messages = _localKakfaService.readStringMessagesInTopic(PRODUCER_QUEUE_PREFIX + i);
+      _log.info("There are " + messages.size() + " messages in this queue");
       // assert
-      assertEquals(1, messages.size());
+      receivedMessages.addAll(messages);
     }
+    assertEquals(10, receivedMessages.size());
     schlossService.stop();
   }
 }

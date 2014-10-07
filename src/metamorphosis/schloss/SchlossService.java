@@ -21,7 +21,9 @@ import org.apache.log4j.Logger;
 
 import metamorphosis.schloss.sources.SchlossSource;
 import metamorphosis.utils.JSONDecoder;
+import metamorphosis.utils.KafkaService;
 import metamorphosis.utils.KafkaUtils;
+import metamorphosis.utils.LocalKafkaService;
 import metamorphosis.utils.Utils;
 
 public class SchlossService {
@@ -35,6 +37,7 @@ public class SchlossService {
   private String _zkConnectString;
   private List<String> _workerQueues;
   private int _queueToPush;
+  private KafkaService _kafkaService;
 
   public SchlossService(String sourceTopic, List<String> brokers, String zkConnectString, List<String> workerQueues) {
     
@@ -47,6 +50,21 @@ public class SchlossService {
     
     
   }
+  
+  public SchlossService(String sourceTopic, List<String> brokers, KafkaService kafkaService, String zkConnectString, List<String> workerQueues) {
+    
+    _brokers = brokers;
+    _sourceTopic = sourceTopic;
+    _zkConnectString = zkConnectString;
+    _workerQueues = workerQueues;
+    _queueToPush = 0;
+    _kafkaService = kafkaService;
+    
+    
+    
+  }
+  
+  
 
   public void start() {
     // Start while loop
@@ -79,6 +97,17 @@ public class SchlossService {
 
   protected void distributeMessagesToQueues(List<String> workerQueueMessages) {
     // Distribute strategy
+    
+    for( String workerQueueMessage : workerQueueMessages) {
+      
+      int numQueues = _workerQueues.size();
+      String topicQueue = _workerQueues.get(_queueToPush % numQueues);
+      _log.info("Sending message " + workerQueueMessage + " to queue: " + topicQueue);
+      _kafkaService.sendMessage(topicQueue, workerQueueMessage);
+      _queueToPush += 1;
+    
+    }
+   
     
   }
 

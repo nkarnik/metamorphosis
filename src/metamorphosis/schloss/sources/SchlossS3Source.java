@@ -32,9 +32,17 @@ public class SchlossS3Source implements SchlossSource{
     _manifestContents = null ;
     try {
       _manifestContents  = Lists.newArrayList(S3Util.readFile(_bucketName, _manifestPath).split("\n"));
+      _log.info("First manifest object is " + _manifestContents.get(0));
     } catch (IOException e) {
       _log.info("Failed to get s3 manifest path: " + _manifestPath);
     }
+  }
+
+
+  @Override
+  public List<String> getWorkerMessages() {
+    // TODO Auto-generated method stub
+    return _manifestContents;
   }
 
   

@@ -95,6 +95,7 @@ public class SchlossService {
       messages.add(new KeyedMessage<Integer,String>(topicQueue,workerQueueMessage));
       _queueToPush += 1;
     }
+    _log.info("sending message to " + Joiner.on(',').join(_brokers));
     //Create the producer for this distribution
     Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_brokers), "kafka.producer.DefaultPartitioner");
     Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));

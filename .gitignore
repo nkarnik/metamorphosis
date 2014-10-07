@@ -12,11 +12,13 @@ logs
 *.jar
 *.log
 
-*.class
-
 # Package Files #
 *.war
 *.ear
 .DS_Store
 \#*#
 /target
+bin
+*.swp
+*.class
+

@@ -67,7 +67,6 @@ public class SchlossTest {
     // run SchlossService
     schlossService.start();
     // verify that SchlossService fills producer_qs
-    Thread.sleep(5000);
     _localKakfaService.sendMessage(SOURCE_TOPIC, message);
     Thread.sleep(5000);
 
@@ -78,6 +77,8 @@ public class SchlossTest {
       _log.info("There are " + messages.size() + " messages in this queue");
       receivedMessages.addAll(messages);
     }
+    _log.info("Total messages on producer queues: " + receivedMessages.size());
+    
     assertEquals(10, receivedMessages.size());
     schlossService.stop();
   }

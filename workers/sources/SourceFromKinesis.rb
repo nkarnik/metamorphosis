@@ -21,7 +21,7 @@ class SourceFromKinesis
 
     info "Getting shard iterator for stream #{@stream_name}, shard #{@shard} with offset #{@offset}"
 
-    @fetch_size = 20
+    @fetch_size = 2000
 
     if @offset == "0"
       @shard_iter = @_kinesis.get_shard_iterator(:stream_name => @stream_name, :shard_id => @shard, :shard_iterator_type => "LATEST")
@@ -53,7 +53,7 @@ class SourceFromKinesis
         results.records.each do |record|
           gz.write record.data.to_s
           gz.write "\n"
-          info "data written"
+          #info "data written"
           @_sqnum = record.sequence_number
         end
         gz.close

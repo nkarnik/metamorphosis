@@ -4,6 +4,19 @@ manifest
 *.template
 offse*
 logs
+.settings
+*.class
+*.rdb
+*.swp
+*.orig
+*.jar
+*.log
+
+# Package Files #
+*.war
+*.ear
+.DS_Store
+\#*#
 /target
 bin
 *.swp

@@ -19,3 +19,4 @@ logs
 *.ear
 .DS_Store
 \#*#
+/target

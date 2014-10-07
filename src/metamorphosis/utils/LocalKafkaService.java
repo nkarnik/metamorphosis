@@ -43,7 +43,6 @@ import com.google.common.collect.Lists;
  */
 public class LocalKafkaService implements KafkaService{
 
-  private static final long serialVersionUID = -4958793274858859339L;
   private EmbeddedZookeeper _zkServer;
   private ArrayList<KafkaServer> _servers;
   private Producer<Integer, String> _producer;
@@ -116,7 +115,6 @@ public class LocalKafkaService implements KafkaService{
   
   /** For mocks only */
   private void initLocalProducer() {
-
     // setup producer
     Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(getSeedBrokers()), "kafka.producer.DefaultPartitioner");
     _producer = new Producer<Integer,String>(new ProducerConfig(properties));
@@ -130,7 +128,10 @@ public class LocalKafkaService implements KafkaService{
   }
   
   
-  /** Send a single message */
+
+  /**
+   * For configuration and mock use only. 
+   */
   public void sendMessage(String topic, String message) {
     if(_producer == null) {
       initLocalProducer();

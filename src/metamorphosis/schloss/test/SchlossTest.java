@@ -7,7 +7,6 @@ import java.util.List;
 
 import metamorphosis.schloss.SchlossService;
 import metamorphosis.utils.LocalKafkaService;
-import net.sf.json.JSONObject;
 import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;
 
@@ -60,23 +59,23 @@ public class SchlossTest {
     String message = builder.toString();
 
     // GMB sends message to schloss topic
-    _localKakfaService.sendMessage(SOURCE_TOPIC, message);
     // create SchlossService
     SchlossService schlossService = new SchlossService(SOURCE_TOPIC, 
                                                       _localKakfaService.getSeedBrokers(),
-                                                      _localKakfaService,
                                                       _localKakfaService.getZKConnectString(), 
                                                       _workerQueues);
     // run SchlossService
     schlossService.start();
     // verify that SchlossService fills producer_qs
     Thread.sleep(5000);
+    _localKakfaService.sendMessage(SOURCE_TOPIC, message);
+    Thread.sleep(5000);
+
     _log.info("Reading messages for confirmation");
     List<String> receivedMessages = new ArrayList<String>();
     for (int i = 0; i < NUM_BROKERS; i++) {
       List<String> messages = _localKakfaService.readStringMessagesInTopic(PRODUCER_QUEUE_PREFIX + i);
       _log.info("There are " + messages.size() + " messages in this queue");
-      // assert
       receivedMessages.addAll(messages);
     }
     assertEquals(10, receivedMessages.size());

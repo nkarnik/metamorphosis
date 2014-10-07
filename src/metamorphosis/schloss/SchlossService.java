@@ -3,6 +3,7 @@ package metamorphosis.schloss;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -13,18 +14,22 @@ import kafka.consumer.ConsumerTimeoutException;
 import kafka.consumer.KafkaStream;
 import kafka.javaapi.consumer.ConsumerConnector;
 import kafka.message.MessageAndMetadata;
+import kafka.producer.KeyedMessage;
+import kafka.producer.Producer;
+import kafka.producer.ProducerConfig;
 import kafka.serializer.StringDecoder;
+import kafka.utils.TestUtils;
 import kafka.utils.VerifiableProperties;
+import metamorphosis.schloss.sources.SchlossSource;
+import metamorphosis.utils.JSONDecoder;
+import metamorphosis.utils.KafkaUtils;
+import metamorphosis.utils.Utils;
 import net.sf.json.JSONObject;
 
 import org.apache.log4j.Logger;
 
-import metamorphosis.schloss.sources.SchlossSource;
-import metamorphosis.utils.JSONDecoder;
-import metamorphosis.utils.KafkaService;
-import metamorphosis.utils.KafkaUtils;
-import metamorphosis.utils.LocalKafkaService;
-import metamorphosis.utils.Utils;
+import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
 
 public class SchlossService {
 
@@ -37,31 +42,15 @@ public class SchlossService {
   private String _zkConnectString;
   private List<String> _workerQueues;
   private int _queueToPush;
-  private KafkaService _kafkaService;
+  //private KafkaService _kafkaService;
 
-  public SchlossService(String sourceTopic, List<String> brokers, String zkConnectString, List<String> workerQueues) {
-    
-    _brokers = brokers;
-    _sourceTopic = sourceTopic;
-    _zkConnectString = zkConnectString;
-    _workerQueues = workerQueues;
-    _queueToPush = 0;
-    
-    
-    
-  }
   
-  public SchlossService(String sourceTopic, List<String> brokers, KafkaService kafkaService, String zkConnectString, List<String> workerQueues) {
-    
-    _brokers = brokers;
-    _sourceTopic = sourceTopic;
+  public SchlossService(String sourceTopic, List<String> seedBrokers, String zkConnectString, List<String> workerQueues) {
+    _brokers = seedBrokers;
     _zkConnectString = zkConnectString;
+    _sourceTopic = sourceTopic;
     _workerQueues = workerQueues;
     _queueToPush = 0;
-    _kafkaService = kafkaService;
-    
-    
-    
   }
   
   
@@ -75,20 +64,21 @@ public class SchlossService {
         isRunning = new AtomicBoolean(true);
         // Create an iterator
         ConsumerIterator<String, JSONObject> iterator = getIterator();
-        try{
-          // Blocking wait on source topic
-          while(isRunning.get() && iterator.hasNext()){
-            MessageAndMetadata<String, JSONObject> next = iterator.next();
-            JSONObject message = next.message();
-            SchlossSource schlossSource = SchlossSourceFactory.createSource(message);
-            List<String> workerQueueMessages = schlossSource.getWorkerMessages();
-            distributeMessagesToQueues(workerQueueMessages);
-            
+        while(isRunning.get()){
+          try{
+            // Blocking wait on source topic
+            while(iterator.hasNext()){
+              MessageAndMetadata<String, JSONObject> next = iterator.next();
+              JSONObject message = next.message();
+              SchlossSource schlossSource = SchlossSourceFactory.createSource(message);
+              List<String> workerQueueMessages = schlossSource.getWorkerMessages();
+              distributeMessagesToQueues(workerQueueMessages);
+              
+            }
+          }catch(ConsumerTimeoutException e){
+            _log.info("No messages yet on " + _sourceTopic + ". Blocking on iterator.hasNext...");
           }
-        }catch(ConsumerTimeoutException e){
-          _log.info("No messages yet on " + _sourceTopic + ". Sleeping for " + SLEEP_BETWEEN_READS + " seconds");
         }
-        
         _log.info("Done with the schloss service loop");
         return null;
       }
@@ -97,29 +87,24 @@ public class SchlossService {
 
   protected void distributeMessagesToQueues(List<String> workerQueueMessages) {
     // Distribute strategy
-    
+    List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
     for( String workerQueueMessage : workerQueueMessages) {
-      
       int numQueues = _workerQueues.size();
       String topicQueue = _workerQueues.get(_queueToPush % numQueues);
       _log.info("Sending message " + workerQueueMessage + " to queue: " + topicQueue);
-      _kafkaService.sendMessage(topicQueue, workerQueueMessage);
+      messages.add(new KeyedMessage<Integer,String>(topicQueue,workerQueueMessage));
       _queueToPush += 1;
-    
     }
-   
-    
-  }
-
-  private void processMessage(JSONObject message) {
-    _log.info("Processing message: " + message.toString());
-    
-    // Based on type, generate the appropriate messages to workers
+    //Create the producer for this distribution
+    Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_brokers), "kafka.producer.DefaultPartitioner");
+    Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
+    producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
+    producer.close(); 
     
   }
   
   private ConsumerIterator<String, JSONObject> getIterator() {
-    String clientName = "temporary_message_reader";
+    String clientName = "schloss_service_consumer";
     ConsumerConfig consumerConfig = KafkaUtils.createConsumerConfig(_zkConnectString, clientName);
     ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(consumerConfig);
 

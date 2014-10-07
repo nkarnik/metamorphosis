@@ -1,4 +1,4 @@
-package metamorphosis.utils;
+package metamorphosis.kafka;
 
 import java.util.List;
 

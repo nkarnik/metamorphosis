@@ -1,4 +1,4 @@
-package metamorphosis.utils;
+package metamorphosis.utils.s3;
 
 
 public class S3Exception extends Exception {

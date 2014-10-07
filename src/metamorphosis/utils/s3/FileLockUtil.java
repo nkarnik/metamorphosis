@@ -1,4 +1,4 @@
-package metamorphosis.utils;
+package metamorphosis.utils.s3;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -8,6 +8,8 @@ import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.FileLock;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Semaphore;
+
+import metamorphosis.utils.Utils;
 
 import com.google.common.collect.Maps;
 

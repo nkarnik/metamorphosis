@@ -1,4 +1,4 @@
-package metamorphosis.utils;
+package metamorphosis.kafka;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -30,6 +30,7 @@ import kafka.utils.TestZKUtils;
 import kafka.utils.VerifiableProperties;
 import kafka.utils.ZKStringSerializer$;
 import kafka.zk.EmbeddedZookeeper;
+import metamorphosis.utils.KafkaUtils;
 
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.log4j.Logger;

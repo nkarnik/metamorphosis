@@ -3,7 +3,7 @@ package metamorphosis.schloss.sources;
 import java.io.IOException;
 import java.util.List;
 
-import metamorphosis.utils.S3Util;
+import metamorphosis.utils.s3.S3Util;
 import net.sf.json.JSONObject;
 
 import org.apache.log4j.Logger;

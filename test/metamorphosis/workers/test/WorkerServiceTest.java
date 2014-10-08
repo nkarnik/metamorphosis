@@ -41,7 +41,7 @@ public class WorkerServiceTest {
   }
 
   @Test
-  public void testProcessWorkerMessage() throws InterruptedException, ExecutionException{
+  public void testSingleWorkerS3Source() throws InterruptedException, ExecutionException{
 
     JSONBuilder builder = new JSONStringer();
     builder.object()
@@ -60,29 +60,23 @@ public class WorkerServiceTest {
     .endObject();
 
     String message = builder.toString();
+    _localKakfaService.sendMessage(_workerQueues.get(0), message);
 
-    // GMB sends message to schloss topic
-    // create SchlossService
     WorkerService workerService = new WorkerSourceService(_workerQueues.get(0), _localKakfaService);
     workerService.start();
-    // run SchlossService
-    // verify that SchlossService fills producer_qs
-    _localKakfaService.sendMessage(_workerQueues.get(0), message);
-    Thread.sleep(10000);
+    Thread.sleep(5000); // Give 10 seconds for the worker to get the message
 
     _log.info("Waiting on future...");
-    workerService.stop();
+    workerService.stop(); // Awaits executor pool to finish
     
-//    Thread.sleep(5000);
     _log.info("Reading messages for confirmation");
     _log.info("About to read from topic: " + DESTINATION_TOPIC);
     int messages = _localKakfaService.readNumMessages(DESTINATION_TOPIC);
     _log.info("There are " + messages + " messages in this queue");
-    
     _log.info("Total messages on producer queues: " + messages);
     
     assertEquals(1000, messages);
-    workerService.stop();
+
   }
   
   

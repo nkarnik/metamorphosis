@@ -40,13 +40,13 @@ public class WorkerSourceService extends WorkerService {
    */
   
   protected void produceDataToTopic(Iterable<String> workerQueueMessages, String topic) {
-    Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_brokers), "kafka.producer.DefaultPartitioner");
+    Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_kafkaService.getSeedBrokers()), "kafka.producer.DefaultPartitioner");
     Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
     
     
     
     // Distribute strategy
-    _log.info("sending messages to " + Joiner.on(',').join(_brokers));
+    _log.info("sending messages to " + Joiner.on(',').join(_kafkaService.getSeedBrokers()));
     int msgsSent = 0;
     for( String workerQueueMessage : workerQueueMessages) {
       String topicQueue = topic;

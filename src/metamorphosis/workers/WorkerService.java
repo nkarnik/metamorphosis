@@ -10,6 +10,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import kafka.consumer.ConsumerConfig;
@@ -34,12 +35,10 @@ public abstract class WorkerService {
   protected static final long SLEEP_BETWEEN_READS = 30 * 1000;
   private static AtomicBoolean isRunning;
   private Logger _log = Logger.getLogger(WorkerService.class);
-  protected List<String> _brokers;
   private String _sourceTopic;
-  private String _zkConnectString;
   private Future<String> _pushThread;
-  private Future<String> _popThread;
-private static ExecutorService _executorPool =  new ThreadPoolExecutor(5, 10, 1, TimeUnit.HOURS, new SynchronousQueue<Runnable>());
+  private Future<Object> _popThread;
+  private static ExecutorService _executorPool =  new ThreadPoolExecutor(5, 10, 1, TimeUnit.HOURS, new SynchronousQueue<Runnable>());
   private RoundRobinByTopicMessageQueue _topicMessageQueue = new RoundRobinByTopicMessageQueue();
   protected KafkaService _kafkaService;
   protected WorkerFactory _workerFactory;
@@ -61,30 +60,35 @@ private static ExecutorService _executorPool =  new ThreadPoolExecutor(5, 10, 1,
   
   
   public void startRoundRobinPopThread(){
-    Utils.run(new Callable<Object>(){
+    _popThread = Utils.run(new Callable<Object>(){
 
       @Override
       public Object call() throws InterruptedException  {
         _log.info("Entering round robin pop thread");
         while(isRunning.get()){
           //Blocking pop
-          final JSONObject poppedMessage = _topicMessageQueue.pop();
-          //Using the executorPool's internal q to send in callables
-          _log.info("passing to executor: " + poppedMessage.toString());
-          
-          _executorPool.submit(new Callable<Object>(){
-            @Override
-            public Object call() throws Exception {
-              _log.info("Processing message: " + poppedMessage.toString());
-              processMessage(poppedMessage);
-              return null;
-            }
-          });
-
+          _log.info("About to pop from round robin...");
+          try {
+            final JSONObject poppedMessage = _topicMessageQueue.pop();
+            //Using the executorPool's internal q to send in callables
+            _log.info("passing to executor: " + poppedMessage.toString());
+            
+            _executorPool.submit(new Callable<Object>(){
+              @Override
+              public Object call() throws Exception {
+                _log.info("Processing message: " + poppedMessage.toString());
+                processMessage(poppedMessage);
+                return null;
+              }
+            });
+          } catch (TimeoutException e) {
+           continue;
+          }
         }
+        _log.info("Exiting round robin pop thread");
+
         return null;
       }
-      
     });
   }
   
@@ -99,12 +103,14 @@ private static ExecutorService _executorPool =  new ThreadPoolExecutor(5, 10, 1,
         _log.info("Entering worker service loop. Waiting on topic: " + _sourceTopic);
         // Create an iterator
         ConsumerIterator<String, JSONObject> iterator = getMessageTopicIterator();
-        _log.info("waiting on kafka topic iterator...");
         while(isRunning.get()){
           try{
+            _log.info("waiting on kafka topic iterator...");
         
             // Blocking wait on source topic
             while(iterator.hasNext()){
+              _log.info("iterator has next");
+
               MessageAndMetadata<String, JSONObject> messageAndMeta = iterator.next();
               // TODO: Change this to use an executorPool
               _topicMessageQueue.push(messageAndMeta);
@@ -123,7 +129,7 @@ private static ExecutorService _executorPool =  new ThreadPoolExecutor(5, 10, 1,
 
   private ConsumerIterator<String, JSONObject> getMessageTopicIterator() {
     String clientName = "worker_service_consumer_" + _sourceTopic;
-    ConsumerConfig consumerConfig = KafkaUtils.createConsumerConfig(_zkConnectString, clientName);
+    ConsumerConfig consumerConfig = KafkaUtils.createConsumerConfig(_kafkaService.getZKConnectString(), clientName);
     ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(consumerConfig);
 
     Map<String, Integer> topicCountMap = new HashMap<String, Integer>();

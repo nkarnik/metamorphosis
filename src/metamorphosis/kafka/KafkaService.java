@@ -82,6 +82,24 @@ public class KafkaService implements Serializable{
     return new Producer<Integer,String>(new ProducerConfig(properties));
   }
  
+  public <K,V> Producer<K,V> getAsyncProducer(String producerName){
+  Properties props = new Properties();
+    
+    props.put("metadata.broker.list", Joiner.on(",").join(_seedBrokers));
+    props.put("serializer.class", "kafka.serializer.StringEncoder");
+    props.put("partitioner.class", "kafka.producer.DefaultPartitioner");
+    props.put("partitioner.type", "async");
+    props.put("queue.buffering.max.ms", "3000");
+    props.put("queue.buffering.max.messages", "200");
+    props.put("request.required.acks", "1");
+    
+    props.put("client.id", "producer_" + producerName);
+    
+    ProducerConfig config = new ProducerConfig(props);
+    _log.info(producerName + ": Creating kafka producer");
+    return new Producer<K,V>(config);
+  }
+  
   public void createTopic(String topic, int partitions, int replicationFactor){
     // create topic
     ZkClient client = createZKClient();

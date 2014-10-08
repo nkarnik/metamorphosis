@@ -2,14 +2,12 @@ package metamorphosis.workers.test;
 
 import static org.junit.Assert.assertEquals;
 
-import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 
 import metamorphosis.kafka.LocalKafkaService;
 import metamorphosis.workers.WorkerService;
+import metamorphosis.workers.sources.WorkerSourceService;
 import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;
 
@@ -43,7 +41,7 @@ public class WorkerServiceTest {
   }
 
   @Test
-  public void testProcessWorkerMessage() throws InterruptedException, ExecutionException{
+  public void testSingleWorkerS3Source() throws InterruptedException, ExecutionException{
 
     JSONBuilder builder = new JSONStringer();
     builder.object()
@@ -62,32 +60,23 @@ public class WorkerServiceTest {
     .endObject();
 
     String message = builder.toString();
-
-    // GMB sends message to schloss topic
-    // create SchlossService
-    WorkerService workerService = new WorkerService(_workerQueues.get(0), 
-                                                      _localKakfaService.getSeedBrokers(),
-                                                      _localKakfaService.getZKConnectString());
-    // run SchlossService
-    Future<String> workerServiceFuture = workerService.start();
-    // verify that SchlossService fills producer_qs
     _localKakfaService.sendMessage(_workerQueues.get(0), message);
-    Thread.sleep(2000);
+
+    WorkerService workerService = new WorkerSourceService(_workerQueues.get(0), _localKakfaService);
+    workerService.start();
+    Thread.sleep(5000); // Give 10 seconds for the worker to get the message
 
     _log.info("Waiting on future...");
-    workerService.stop();
-    workerServiceFuture.get();
+    workerService.stop(); // Awaits executor pool to finish
     
-//    Thread.sleep(5000);
     _log.info("Reading messages for confirmation");
     _log.info("About to read from topic: " + DESTINATION_TOPIC);
     int messages = _localKakfaService.readNumMessages(DESTINATION_TOPIC);
     _log.info("There are " + messages + " messages in this queue");
-    
     _log.info("Total messages on producer queues: " + messages);
     
     assertEquals(1000, messages);
-    workerService.stop();
+
   }
   
   

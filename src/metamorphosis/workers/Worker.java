@@ -1,7 +1,7 @@
-package metamorphosis.workers.sources;
+package metamorphosis.workers;
 
 
-public interface WorkerSource {
+public interface Worker {
   
   public Iterable<String> getMessageIterator();
 

@@ -1,10 +1,10 @@
 package metamorphosis.workers;
 
-import org.apache.commons.lang.NotImplementedException;
-
 import metamorphosis.workers.sources.WorkerS3Source;
 import metamorphosis.workers.sources.WorkerSource;
 import net.sf.json.JSONObject;
+
+import org.apache.commons.lang.NotImplementedException;
 
 public class WorkerSourceFactory {
 

@@ -1,10 +1,9 @@
 package metamorphosis.workers.sources;
 
-import java.util.List;
 
 public interface WorkerSource {
   
-  public List<String> getMessages();
+  public Iterable<String> getMessageIterator();
 
   public String getTopic();
 

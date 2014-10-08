@@ -5,13 +5,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.apache.log4j.Logger;
-
-import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
 
 import kafka.consumer.ConsumerConfig;
 import kafka.consumer.ConsumerIterator;
@@ -25,42 +22,42 @@ import kafka.producer.ProducerConfig;
 import kafka.serializer.StringDecoder;
 import kafka.utils.TestUtils;
 import kafka.utils.VerifiableProperties;
-import metamorphosis.schloss.SchlossService;
-import metamorphosis.schloss.SchlossSourceFactory;
-import metamorphosis.schloss.sources.SchlossSource;
 import metamorphosis.utils.JSONDecoder;
 import metamorphosis.utils.KafkaUtils;
 import metamorphosis.utils.Utils;
 import metamorphosis.workers.sources.WorkerSource;
 import net.sf.json.JSONObject;
 
-public class ShardProducerService {
+import org.apache.log4j.Logger;
+
+import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
+
+public class WorkerService {
   
   
   protected static final long SLEEP_BETWEEN_READS = 30 * 1000;
   private static AtomicBoolean isRunning;
-  private Logger _log = Logger.getLogger(ShardProducerService.class);
+  private Logger _log = Logger.getLogger(WorkerService.class);
   private List<String> _brokers;
   private String _sourceTopic;
   private String _zkConnectString;
-  private List<String> _workerQueues;
-  
-  
+  private Future<String> _sourceReadThread;
+  private static ExecutorService _executorPool = Executors.newCachedThreadPool();
 
-  public ShardProducerService(String sourceTopic, List<String> seedBrokers, String zkConnectString, List<String> workerQueues) {
+
+  public WorkerService(String sourceTopic, List<String> seedBrokers, String zkConnectString) {
     _brokers = seedBrokers;
     _zkConnectString = zkConnectString;
     _sourceTopic = sourceTopic;
-    _workerQueues = workerQueues;
-
   }
   
-  public void start() {
+  public Future<String> start() {
     // Start while loop
-    Future<String> sourceReadThread = Utils.run(new Callable<String>(){
+    _sourceReadThread = Utils.run(new Callable<String>(){
       @Override
       public String call() throws Exception {
-        _log.info("Entering schloss service loop");
+        _log.info("Entering worker service loop. Waiting on topic: " + _sourceTopic);
         isRunning = new AtomicBoolean(true);
         // Create an iterator
         ConsumerIterator<String, JSONObject> iterator = getIterator();
@@ -69,11 +66,17 @@ public class ShardProducerService {
             // Blocking wait on source topic
             while(iterator.hasNext()){
               MessageAndMetadata<String, JSONObject> next = iterator.next();
-              JSONObject message = next.message();
-              WorkerSource workerSource = WorkerSourceFactory.createSource(message);
-              List<String> workerQueueMessages = workerSource.getMessages();
-              distributeMessagesToTopic(workerQueueMessages, workerSource.getTopic());
-              
+              final JSONObject message = next.message();
+              // TODO: Change this to use an executorPool
+              Future<Boolean> future = Utils.run(new Callable<Boolean>(){
+                @Override
+                public Boolean call() throws Exception {
+                  WorkerSource workerSource = WorkerSourceFactory.createSource(message);
+                  Iterable<String> workerQueueMessages = workerSource.getMessageIterator();
+                  distributeDataToTopic(workerQueueMessages, workerSource.getTopic());
+                  return null;
+                }
+              });
             }
           }catch(ConsumerTimeoutException e){
             _log.info("No messages yet on " + _sourceTopic + ". Blocking on iterator.hasNext...");
@@ -83,28 +86,34 @@ public class ShardProducerService {
         return null;
       }
     });
+    return _sourceReadThread;
   }
   
-  protected void distributeMessagesToTopic(List<String> workerMessages, String topic) {
-    // Distribute strategy
-    List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
-    for( String workerQueueMessage : workerMessages) {
-      String topicQueue = topic;
-      //_log.info("Sending message " + workerQueueMessage + " to queue: " + topic);
-      messages.add(new KeyedMessage<Integer,String>(topicQueue,workerQueueMessage));
- 
-    }
-    _log.info("sending message to " + Joiner.on(',').join(_brokers));
-    //Create the producer for this distribution
+  protected void distributeDataToTopic(Iterable<String> workerQueueMessages, String topic) {
     Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_brokers), "kafka.producer.DefaultPartitioner");
     Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
-    producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
+    
+    // Distribute strategy
+    _log.info("sending messages to " + Joiner.on(',').join(_brokers));
+    int msgsSent = 0;
+    for( String workerQueueMessage : workerQueueMessages) {
+      String topicQueue = topic;
+      //_log.info("Sending message " + workerQueueMessage + " to queue: " + topic);
+      List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
+      messages.add(new KeyedMessage<Integer,String>(topicQueue,workerQueueMessage));
+      producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
+      msgsSent++;
+    }
+    _log.info("messages sent: " + msgsSent);
+    //Create the producer for this distribution
+    
+    
     producer.close(); 
     
   }
   
   private ConsumerIterator<String, JSONObject> getIterator() {
-    String clientName = "schloss_service_consumer";
+    String clientName = "worker_service_consumer";
     ConsumerConfig consumerConfig = KafkaUtils.createConsumerConfig(_zkConnectString, clientName);
     ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(consumerConfig);
 

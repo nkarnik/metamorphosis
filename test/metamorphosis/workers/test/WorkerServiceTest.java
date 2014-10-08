@@ -2,28 +2,28 @@ package metamorphosis.workers.test;
 
 import static org.junit.Assert.assertEquals;
 
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import metamorphosis.kafka.LocalKafkaService;
-import metamorphosis.schloss.SchlossService;
-import metamorphosis.schloss.test.SchlossTest;
-import metamorphosis.workers.ShardProducerService;
+import metamorphosis.workers.WorkerService;
 import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;
 
-import org.apache.log4j.Category;
 import org.apache.log4j.Logger;
 import org.junit.Before;
 import org.junit.Test;
 
-public class ShardProducerTest {
+public class WorkerServiceTest {
   
   private ArrayList<String> _workerQueues;
   private LocalKafkaService _localKakfaService;
   private String PRODUCER_QUEUE_PREFIX = "producer_queue_";
   private int NUM_BROKERS = 3;
-  private Logger _log = Logger.getLogger(ShardProducerTest.class);
+  private Logger _log = Logger.getLogger(WorkerServiceTest.class);
   private String DESTINATION_TOPIC = "dest_topic";
 
   @Before
@@ -43,7 +43,7 @@ public class ShardProducerTest {
   }
 
   @Test
-  public void testProcessGMBSourceMessage() throws InterruptedException {
+  public void testProcessWorkerMessage() throws InterruptedException, ExecutionException{
 
     JSONBuilder builder = new JSONStringer();
     builder.object()
@@ -65,31 +65,29 @@ public class ShardProducerTest {
 
     // GMB sends message to schloss topic
     // create SchlossService
-    ShardProducerService shardProducerService = new ShardProducerService(_workerQueues.get(0), 
+    WorkerService workerService = new WorkerService(_workerQueues.get(0), 
                                                       _localKakfaService.getSeedBrokers(),
-                                                      _localKakfaService.getZKConnectString(), 
-                                                      _workerQueues);
+                                                      _localKakfaService.getZKConnectString());
     // run SchlossService
-    shardProducerService.start();
+    Future<String> workerServiceFuture = workerService.start();
     // verify that SchlossService fills producer_qs
     _localKakfaService.sendMessage(_workerQueues.get(0), message);
-    Thread.sleep(5000);
+    Thread.sleep(2000);
 
+    _log.info("Waiting on future...");
+    workerService.stop();
+    workerServiceFuture.get();
+    
+//    Thread.sleep(5000);
     _log.info("Reading messages for confirmation");
-    List<String> receivedMessages = new ArrayList<String>();
-    
-    Thread.sleep(5000);
-    
-    
     _log.info("About to read from topic: " + DESTINATION_TOPIC);
-    List<String> messages = _localKakfaService.readStringMessagesInTopic(DESTINATION_TOPIC);
-    _log.info("There are " + messages.size() + " messages in this queue");
-    receivedMessages.addAll(messages);
+    int messages = _localKakfaService.readNumMessages(DESTINATION_TOPIC);
+    _log.info("There are " + messages + " messages in this queue");
     
-    _log.info("Total messages on producer queues: " + receivedMessages.size());
+    _log.info("Total messages on producer queues: " + messages);
     
-    assertEquals(1000, receivedMessages.size());
-    shardProducerService.stop();
+    assertEquals(1000, messages);
+    workerService.stop();
   }
   
   

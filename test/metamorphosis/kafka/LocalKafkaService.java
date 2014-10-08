@@ -120,14 +120,7 @@ public class LocalKafkaService implements KafkaService{
     Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(getSeedBrokers()), "kafka.producer.DefaultPartitioner");
     _producer = new Producer<Integer,String>(new ProducerConfig(properties));
   }
-  
-  /**
-   * Builds a simple consumer
-   */
-  private SimpleConsumer getSimpleConsumer(PartitionMetadata partitionMetadata, int timeout, int bufferSize, String consumerClientName){
-    return new SimpleConsumer(partitionMetadata.leader().host(), partitionMetadata.leader().port(), timeout, bufferSize, consumerClientName);
-  }
-  
+
   
 
   /**
@@ -181,7 +174,7 @@ public class LocalKafkaService implements KafkaService{
     try{
       while(iterator.hasNext()){
         String message = iterator.next().message();
-        _log.info("Next message is " + message);
+        _log.info("Next message is " + message.substring(0, 30) + "...");
         messages.add(message);
       }
     }catch(ConsumerTimeoutException e){
@@ -193,52 +186,30 @@ public class LocalKafkaService implements KafkaService{
   }
   
   /** Returns number of messages found in all partitions for the given topic*/
-  public int readAllPartitions(int partitions, String topic, int timeout, int bufferSize, String consumerClientName, int fetchSize) throws UnsupportedEncodingException {
-    int numResults = 0;
-    for(int partition = 0; partition < partitions; partition++){
-      PartitionMetadata partitionMetadata = KafkaUtils.findPartitionMetadata(getSeedBrokers(), topic, partition);
-      
-      // create a consumer for reading
-      SimpleConsumer consumer = getSimpleConsumer(partitionMetadata, timeout, bufferSize, consumerClientName);
+  public int readNumMessages(String topic){
+    int numMessages = 0;
+    
+    String clientName = "temporary_message_reader";
+    ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(KafkaUtils.createConsumerConfig(getZKConnectString(), clientName));
 
-      long readOffset = 0;
-      int numReads = 0;
-      
-      // An arbitrary number of reads are required to complete a partition
-      while(true){
-        FetchRequest req = new FetchRequestBuilder().clientId(consumerClientName)
-            .addFetch(topic, partition, readOffset, fetchSize) 
-            .build();
-        FetchResponse fetchResponse = consumer.fetch(req);
-        
-        if(fetchResponse.hasError()){
-          System.out.println("Error in fetch:: " + fetchResponse.errorCode(topic, partition));
-          continue;
-        }
-        ByteBufferMessageSet messageSet = fetchResponse.messageSet(topic, partition);
-        
-        // Each fetch request consists of several messages of max size fetchSize.
-        for (MessageAndOffset messageAndOffset : messageSet) {
-          long currentOffset = messageAndOffset.offset();
-          if (currentOffset < readOffset) {
-            System.out.println("Found an old offset: " + currentOffset + " Expecting: " + readOffset);
-            continue;
-          }
-          readOffset = messageAndOffset.nextOffset();
-          numResults += 1;
-        }
-
-        if(messageSet.sizeInBytes() == 0 || messageSet.sizeInBytes() < fetchSize){
-          // Note. this works because we assume that no data is being pushed in while we're consuming,
-          // Isn't true always.
-          break; // Done with partition
-        }
-        numReads += 1;
+    Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
+    topicCountMap.put(topic, new Integer(1)); // This consumer will only have one thread
+    StringDecoder stringDecoder = new StringDecoder(new VerifiableProperties());
+    KafkaStream<String,String> kafkaStream = consumer.createMessageStreams(topicCountMap, stringDecoder, stringDecoder).get(topic).get(0);
+    ConsumerIterator<String, String> iterator = kafkaStream.iterator();
+    _log.info("Consumer " + clientName + " instantiated");
+    try{
+      while(iterator.hasNext()){
+        String message = iterator.next().message();
+        //_log.info("Next message is " + message.substring(0, 30) + "...");
+        numMessages++;
       }
-      System.out.println("Partition complete: " + partition + " Reads completed: " + numReads);
-      consumer.close();
+    }catch(ConsumerTimeoutException e){
+      _log.info("Completed reading from " + topic + ". Num Messages: " + numMessages);
+    }catch(Exception e) {
+      _log.info("Error is: " + e.getMessage());
     }
-    return numResults;
+    return numMessages;
   }
 
   

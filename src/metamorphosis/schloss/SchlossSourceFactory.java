@@ -1,10 +1,10 @@
 package metamorphosis.schloss;
 
-import org.apache.commons.lang.NotImplementedException;
-
 import metamorphosis.schloss.sources.SchlossS3Source;
 import metamorphosis.schloss.sources.SchlossSource;
 import net.sf.json.JSONObject;
+
+import org.apache.commons.lang.NotImplementedException;
 
 public class SchlossSourceFactory {
 

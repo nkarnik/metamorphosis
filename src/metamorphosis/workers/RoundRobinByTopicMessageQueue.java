@@ -46,7 +46,9 @@ public class RoundRobinByTopicMessageQueue {
       queue.add(message);
       _queues.put(topic, queue);
     }
+    
     _remainingMessages += 1;
+    _log.info("Pushed message into round robin. Current remaining messages: " + _remainingMessages);
   }
   
   /**
@@ -54,14 +56,16 @@ public class RoundRobinByTopicMessageQueue {
    * @return
    */
   public JSONObject pop() {
-    if (_queues.size() == 0) {
-      return null;
-    }
-    
     JSONObject popped = null;
     int topicsSeen = 0;
     
     do {
+      if (_queues.size() == 0) {
+        _log.info("No topics in queue. Nothing to pop, waiting ...");
+        Utils.sleep(1000);
+        continue;
+        
+      }
       String currentTopic = _topics.get(_queueNum);
       ConcurrentLinkedQueue<JSONObject> concurrentLinkedQueue = _queues.get(currentTopic);
       popped =  concurrentLinkedQueue.poll();
@@ -75,11 +79,9 @@ public class RoundRobinByTopicMessageQueue {
         Utils.sleep(1000);
       }
     } while (popped == null );
-    
-    if (popped != null) {
-      _remainingMessages -= 1;
-    }
-    
+    _remainingMessages -= 1;
+    _log.info("Popped message from round robin. Current remaining messages: " + _remainingMessages);
+
     return popped;
   }
   

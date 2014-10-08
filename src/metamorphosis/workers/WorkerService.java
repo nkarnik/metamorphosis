@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -41,8 +43,8 @@ public class WorkerService {
   private String _sourceTopic;
   private String _zkConnectString;
   private Future<String> _sourceReadThread;
-  
-  
+  private static ExecutorService _executorPool = Executors.newCachedThreadPool();
+
 
   public WorkerService(String sourceTopic, List<String> seedBrokers, String zkConnectString) {
     _brokers = seedBrokers;
@@ -64,11 +66,16 @@ public class WorkerService {
             // Blocking wait on source topic
             while(iterator.hasNext()){
               MessageAndMetadata<String, JSONObject> next = iterator.next();
-              JSONObject message = next.message();
-              WorkerSource workerSource = WorkerSourceFactory.createSource(message);
-              Iterable<String> workerQueueMessages = workerSource.getMessageIterator();
-              distributeDataToTopic(workerQueueMessages, workerSource.getTopic());
-              
+              final JSONObject message = next.message();
+              Future<Boolean> future = Utils.run(new Callable<Boolean>(){
+                @Override
+                public Boolean call() throws Exception {
+                  WorkerSource workerSource = WorkerSourceFactory.createSource(message);
+                  Iterable<String> workerQueueMessages = workerSource.getMessageIterator();
+                  distributeDataToTopic(workerQueueMessages, workerSource.getTopic());
+                  return null;
+                }
+              });
             }
           }catch(ConsumerTimeoutException e){
             _log.info("No messages yet on " + _sourceTopic + ". Blocking on iterator.hasNext...");

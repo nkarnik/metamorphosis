@@ -2,7 +2,6 @@ package metamorphosis.workers.sources;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.util.List;
 
 import metamorphosis.utils.BufferedReaderIterable;
 import metamorphosis.utils.s3.S3Exception;
@@ -10,8 +9,6 @@ import metamorphosis.utils.s3.S3Util;
 import net.sf.json.JSONObject;
 
 import org.apache.log4j.Logger;
-
-import com.google.common.collect.Lists;
 
 
 public class WorkerS3Source implements WorkerSource {
@@ -48,6 +45,17 @@ public class WorkerS3Source implements WorkerSource {
       _log.info("Failed to get s3 manifest path: " + _shardPath);
     }  
     return _brIterable;
+  }
+  
+  public void shutdown(){
+    if(_bufferedShardReader != null){
+      try {
+        _bufferedShardReader.close();
+      } catch (IOException e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
+      }
+    }
   }
 
   @Override

@@ -67,6 +67,7 @@ public class WorkerService {
             while(iterator.hasNext()){
               MessageAndMetadata<String, JSONObject> next = iterator.next();
               final JSONObject message = next.message();
+              // TODO: Change this to use an executorPool
               Future<Boolean> future = Utils.run(new Callable<Boolean>(){
                 @Override
                 public Boolean call() throws Exception {

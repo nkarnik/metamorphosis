@@ -1,6 +1,5 @@
 package metamorphosis.kafka;
 
-import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -8,17 +7,10 @@ import java.util.Map;
 import java.util.Properties;
 
 import kafka.admin.AdminUtils;
-import kafka.api.FetchRequest;
-import kafka.api.FetchRequestBuilder;
 import kafka.consumer.ConsumerIterator;
 import kafka.consumer.ConsumerTimeoutException;
 import kafka.consumer.KafkaStream;
-import kafka.javaapi.FetchResponse;
-import kafka.javaapi.PartitionMetadata;
 import kafka.javaapi.consumer.ConsumerConnector;
-import kafka.javaapi.consumer.SimpleConsumer;
-import kafka.javaapi.message.ByteBufferMessageSet;
-import kafka.message.MessageAndOffset;
 import kafka.producer.KeyedMessage;
 import kafka.producer.Producer;
 import kafka.producer.ProducerConfig;
@@ -42,8 +34,9 @@ import com.google.common.collect.Lists;
  * A Local Kafka Service for testing
  *
  */
-public class LocalKafkaService implements KafkaService{
+public class LocalKafkaService extends KafkaService{
 
+  private static final long serialVersionUID = 4341775956497299044L;
   private EmbeddedZookeeper _zkServer;
   private ArrayList<KafkaServer> _servers;
   private Producer<Integer, String> _producer;

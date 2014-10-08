@@ -173,14 +173,16 @@ public class LocalKafkaService implements KafkaService{
     ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(KafkaUtils.createConsumerConfig(getZKConnectString(), clientName));
 
     Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
-    topicCountMap.put(topic, new Integer(1)); // This consumer will only have one thread
+    topicCountMap.put(topic, new Integer(3)); // This consumer will only have one thread
     StringDecoder stringDecoder = new StringDecoder(new VerifiableProperties());
     KafkaStream<String,String> kafkaStream = consumer.createMessageStreams(topicCountMap, stringDecoder, stringDecoder).get(topic).get(0);
     ConsumerIterator<String, String> iterator = kafkaStream.iterator();
     _log.info("Consumer " + clientName + " instantiated");
     try{
       while(iterator.hasNext()){
-        messages.add(iterator.next().message());
+        String message = iterator.next().message();
+        _log.info("Next message is " + message);
+        messages.add(message);
       }
     }catch(ConsumerTimeoutException e){
       _log.info("Completed reading from " + topic);

@@ -79,7 +79,7 @@ public class ShardProducerService {
             _log.info("No messages yet on " + _sourceTopic + ". Blocking on iterator.hasNext...");
           }
         }
-        _log.info("Done with the schloss service loop");
+        _log.info("Done with the shard service loop");
         return null;
       }
     });

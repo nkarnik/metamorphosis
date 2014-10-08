@@ -65,11 +65,9 @@ public class WorkerServiceTest {
 
     // GMB sends message to schloss topic
     // create SchlossService
-    WorkerService workerService = new WorkerService(_workerQueues.get(0), 
-                                                      _localKakfaService.getSeedBrokers(),
-                                                      _localKakfaService.getZKConnectString());
+    WorkerService workerService = new WorkerService(_workerQueues.get(0), _localKakfaService);
     // run SchlossService
-    Future<String> workerServiceFuture = workerService.start();
+    Future<String> workerServiceFuture = workerService.startWorkerSourceTopicRead();
     // verify that SchlossService fills producer_qs
     _localKakfaService.sendMessage(_workerQueues.get(0), message);
     Thread.sleep(2000);

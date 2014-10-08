@@ -8,6 +8,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import kafka.consumer.ConsumerConfig;
@@ -22,6 +25,7 @@ import kafka.producer.ProducerConfig;
 import kafka.serializer.StringDecoder;
 import kafka.utils.TestUtils;
 import kafka.utils.VerifiableProperties;
+import metamorphosis.kafka.KafkaService;
 import metamorphosis.utils.JSONDecoder;
 import metamorphosis.utils.KafkaUtils;
 import metamorphosis.utils.Utils;
@@ -43,18 +47,49 @@ public class WorkerService {
   private String _sourceTopic;
   private String _zkConnectString;
   private Future<String> _sourceReadThread;
-  private static ExecutorService _executorPool = Executors.newCachedThreadPool();
+  private static ExecutorService _executorPool =  new ThreadPoolExecutor(5, 10, 1, TimeUnit.HOURS, new SynchronousQueue<Runnable>());
+  private RoundRobinByTopicMessageQueue _topicMessageQueue = new RoundRobinByTopicMessageQueue();
+  private KafkaService _kafkaService;
 
-
-  public WorkerService(String sourceTopic, List<String> seedBrokers, String zkConnectString) {
-    _brokers = seedBrokers;
-    _zkConnectString = zkConnectString;
+  public WorkerService(String sourceTopic, KafkaService kafkaService) {
+    _kafkaService = kafkaService;
     _sourceTopic = sourceTopic;
   }
+  @SuppressWarnings("unchecked")
+  public void startWorkerSourceManagerThread(){
+    
+    Utils.run(new Callable(){
+
+      @Override
+      public Object call() throws InterruptedException  {
+        _log.info("Entering round robin pop thread");
+        while(isRunning.get()){
+          //Blocking pop
+          final JSONObject poppedMessage = _topicMessageQueue.pop();
+          if(poppedMessage != null){
+            //Using the executorPool's internal q to send in callables
+            _executorPool.submit(new Callable<Object>(){
+              @Override
+              public Object call() throws Exception {
+                WorkerSource workerSource = WorkerSourceFactory.createSource(poppedMessage);
+                Iterable<String> workerQueueMessages = workerSource.getMessageIterator();
+                distributeDataToTopic(workerQueueMessages, workerSource.getTopic());
+                return null;
+              }
+            });
+          }else{
+            Thread.sleep(500);
+          }
+        }
+        return null;
+      }
+      
+    });
+  }
   
-  public Future<String> start() {
+  public Future<String> startWorkerSourceTopicRead() {
     // Start while loop
-    _sourceReadThread = Utils.run(new Callable<String>(){
+    Utils.run(new Callable<String>(){
       @Override
       public String call() throws Exception {
         _log.info("Entering worker service loop. Waiting on topic: " + _sourceTopic);
@@ -65,18 +100,9 @@ public class WorkerService {
           try{
             // Blocking wait on source topic
             while(iterator.hasNext()){
-              MessageAndMetadata<String, JSONObject> next = iterator.next();
-              final JSONObject message = next.message();
+              MessageAndMetadata<String, JSONObject> messageAndMeta = iterator.next();
               // TODO: Change this to use an executorPool
-              Future<Boolean> future = Utils.run(new Callable<Boolean>(){
-                @Override
-                public Boolean call() throws Exception {
-                  WorkerSource workerSource = WorkerSourceFactory.createSource(message);
-                  Iterable<String> workerQueueMessages = workerSource.getMessageIterator();
-                  distributeDataToTopic(workerQueueMessages, workerSource.getTopic());
-                  return null;
-                }
-              });
+              _topicMessageQueue.push(messageAndMeta);
             }
           }catch(ConsumerTimeoutException e){
             _log.info("No messages yet on " + _sourceTopic + ". Blocking on iterator.hasNext...");
@@ -89,9 +115,17 @@ public class WorkerService {
     return _sourceReadThread;
   }
   
+  /**
+   * 
+   * @param workerQueueMessages
+   * @param topic
+   */
+  
   protected void distributeDataToTopic(Iterable<String> workerQueueMessages, String topic) {
     Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_brokers), "kafka.producer.DefaultPartitioner");
     Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
+    
+    
     
     // Distribute strategy
     _log.info("sending messages to " + Joiner.on(',').join(_brokers));

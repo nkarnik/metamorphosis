@@ -4,6 +4,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import org.apache.log4j.Logger;
+
+import kafka.message.MessageAndMetadata;
+import metamorphosis.utils.Utils;
 import net.sf.json.JSONObject;
 
 public class RoundRobinByTopicMessageQueue {
@@ -12,6 +16,7 @@ public class RoundRobinByTopicMessageQueue {
   private int _remainingMessages;
   private int _queueNum;
   private ArrayList<String> _topics;
+  private Logger _log = Logger.getLogger(RoundRobinByTopicMessageQueue.class);
 
   public RoundRobinByTopicMessageQueue() {
     
@@ -23,7 +28,9 @@ public class RoundRobinByTopicMessageQueue {
     
   }
   
-  public void push(JSONObject message) {
+  public void push(MessageAndMetadata<String, JSONObject> messageAndMetadata) {
+    
+    JSONObject message = messageAndMetadata.message();
     
     boolean found = false;
     String topic = message.getJSONObject("message").getString("topic");
@@ -42,20 +49,42 @@ public class RoundRobinByTopicMessageQueue {
     _remainingMessages += 1;
   }
   
+  /**
+   * Blocking pop
+   * @return
+   */
   public JSONObject pop() {
-    if (_queues.size() <= 0) {
+    if (_queues.size() == 0) {
       return null;
     }
     
-    String currentTopic = _topics.get(_queueNum % _topics.size());
-    JSONObject popped =  _queues.get(currentTopic).poll();
+    JSONObject popped = null;
+    int topicsSeen = 0;
     
-    _queueNum += 1;
+    do {
+      String currentTopic = _topics.get(_queueNum);
+      ConcurrentLinkedQueue<JSONObject> concurrentLinkedQueue = _queues.get(currentTopic);
+      popped =  concurrentLinkedQueue.poll();
+      
+      int size = _topics.size();
+      _queueNum = (_queueNum == size - 1) ? 0 : _queueNum + 1;
+      topicsSeen++;
+      
+      if(topicsSeen == size){
+        _log .info("No messages in the round robin, waiting...");
+        Utils.sleep(1000);
+      }
+    } while (popped == null );
+    
     if (popped != null) {
       _remainingMessages -= 1;
     }
     
     return popped;
+  }
+  
+  public int remainingMessages() {
+    return _remainingMessages;
   }
   
   

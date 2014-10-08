@@ -51,7 +51,7 @@ public class ShardProducerTest {
     .key("source").object()
         .key("type").value("s3")
         .key("config").object()
-          .key("manifest").value("data/homepages/2014/0620/1013632003/part_0001.gz")
+          .key("manifest").value("data/homepages/2014/0620/1013632003/part_0002.gz")
           .key("bucket").value("fatty.zillabyte.com")
           .key("credentials").object()
             .key("secret").value("")
@@ -88,7 +88,7 @@ public class ShardProducerTest {
     
     _log.info("Total messages on producer queues: " + receivedMessages.size());
     
-    assertEquals(1, receivedMessages.size());
+    assertEquals(695, receivedMessages.size());
     shardProducerService.stop();
   }
   

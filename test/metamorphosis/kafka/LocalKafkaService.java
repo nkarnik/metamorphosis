@@ -180,7 +180,9 @@ public class LocalKafkaService implements KafkaService{
     _log.info("Consumer " + clientName + " instantiated");
     try{
       while(iterator.hasNext()){
-        messages.add(iterator.next().message());
+        String message = iterator.next().message();
+        _log.info("Next message is " + message);
+        messages.add(message);
       }
     }catch(ConsumerTimeoutException e){
       _log.info("Completed reading from " + topic);

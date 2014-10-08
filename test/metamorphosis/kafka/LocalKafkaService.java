@@ -66,7 +66,7 @@ public class LocalKafkaService implements KafkaService{
     for (int i = 0; i < numBrokers; i++) {
       Properties brokerConfig = TestUtils.createBrokerConfig(i, TestUtils.choosePort());
       brokerConfig.setProperty("message.max.bytes", "10000000" );
-      brokerConfig.setProperty("replica.fetch.max.bytes", "10000000" );
+      brokerConfig.setProperty("replica.fetch.max.bytes", "30000000" );
       _servers.add(TestUtils.createServer(new kafka.server.KafkaConfig(brokerConfig), new MockTime()));  
     }
     _log.info("Kafka Service created with " + _servers.size() + " brokers");
@@ -184,6 +184,8 @@ public class LocalKafkaService implements KafkaService{
       }
     }catch(ConsumerTimeoutException e){
       _log.info("Completed reading from " + topic);
+    }catch(Exception e) {
+      _log.info("Error is: " + e.getMessage());
     }
     return messages;
   }

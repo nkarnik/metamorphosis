@@ -8,6 +8,7 @@ import java.util.List;
 import metamorphosis.kafka.LocalKafkaService;
 import metamorphosis.schloss.SchlossService;
 import metamorphosis.schloss.test.SchlossTest;
+import metamorphosis.workers.ShardProducerService;
 import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;
 
@@ -22,8 +23,8 @@ public class ShardProducerTest {
   private LocalKafkaService _localKakfaService;
   private String PRODUCER_QUEUE_PREFIX = "producer_queue_";
   private int NUM_BROKERS = 3;
-  private String SOURCE_TOPIC;
   private Logger _log = Logger.getLogger(ShardProducerTest.class);
+  private String DESTINATION_TOPIC = "dest_topic";
 
   @Before
   public void setup() {
@@ -31,11 +32,13 @@ public class ShardProducerTest {
     
     _localKakfaService = new LocalKafkaService(NUM_BROKERS);
     // Create required topics
+
     for (int i = 0; i < NUM_BROKERS; i++) {
       
       _workerQueues.add(PRODUCER_QUEUE_PREFIX  + i);
       _localKakfaService.createTopic(PRODUCER_QUEUE_PREFIX + i, 1, 1);
     }
+    _localKakfaService.createTopic(DESTINATION_TOPIC, 1, 1);
 
   }
 
@@ -43,13 +46,12 @@ public class ShardProducerTest {
   public void testProcessGMBSourceMessage() throws InterruptedException {
 
     JSONBuilder builder = new JSONStringer();
-    String destinationTopic = "some_topic";
     builder.object()
-    .key("topic").value(destinationTopic)
+    .key("topic").value(DESTINATION_TOPIC)
     .key("source").object()
         .key("type").value("s3")
         .key("config").object()
-          .key("manifest").value("data/homepages/20140620.manifest.debug")
+          .key("manifest").value("data/homepages/2014/0620/1013632003/part_0001.gz")
           .key("bucket").value("fatty.zillabyte.com")
           .key("credentials").object()
             .key("secret").value("")
@@ -63,27 +65,31 @@ public class ShardProducerTest {
 
     // GMB sends message to schloss topic
     // create SchlossService
-    SchlossService schlossService = new SchlossService(SOURCE_TOPIC, 
+    ShardProducerService shardProducerService = new ShardProducerService(_workerQueues.get(0), 
                                                       _localKakfaService.getSeedBrokers(),
                                                       _localKakfaService.getZKConnectString(), 
                                                       _workerQueues);
     // run SchlossService
-    schlossService.start();
+    shardProducerService.start();
     // verify that SchlossService fills producer_qs
-    _localKakfaService.sendMessage(SOURCE_TOPIC, message);
+    _localKakfaService.sendMessage(_workerQueues.get(0), message);
     Thread.sleep(5000);
 
     _log.info("Reading messages for confirmation");
     List<String> receivedMessages = new ArrayList<String>();
-    for (int i = 0; i < NUM_BROKERS; i++) {
-      List<String> messages = _localKakfaService.readStringMessagesInTopic(PRODUCER_QUEUE_PREFIX + i);
-      _log.info("There are " + messages.size() + " messages in this queue");
-      receivedMessages.addAll(messages);
-    }
+    
+    Thread.sleep(5000);
+    
+    
+    _log.info("About to read from topic: " + DESTINATION_TOPIC);
+    List<String> messages = _localKakfaService.readStringMessagesInTopic(DESTINATION_TOPIC);
+    _log.info("There are " + messages.size() + " messages in this queue");
+    receivedMessages.addAll(messages);
+    
     _log.info("Total messages on producer queues: " + receivedMessages.size());
     
-    assertEquals(10, receivedMessages.size());
-    schlossService.stop();
+    assertEquals(1, receivedMessages.size());
+    shardProducerService.stop();
   }
   
   

@@ -1,19 +1,20 @@
-package metamorphosis.schloss;
+package metamorphosis.workers;
 
-import metamorphosis.schloss.sources.SchlossS3Source;
-import metamorphosis.schloss.sources.SchlossSource;
+import metamorphosis.workers.sources.WorkerS3Source;
+import metamorphosis.workers.sources.WorkerSource;
 import net.sf.json.JSONObject;
 
 import org.apache.commons.lang.NotImplementedException;
 
-public class SchlossSourceFactory {
+public class WorkerSourceFactory {
 
-  public static SchlossSource createSource(JSONObject message) {
+  public static WorkerSource createSource(JSONObject message) {
+    
     String type = message.getJSONObject("source").getString("type");
-    SchlossSource schlossSource = null;
+    WorkerSource workerSource = null;
     switch(type){
     case "s3":
-      schlossSource = new SchlossS3Source(message);
+      workerSource = new WorkerS3Source(message);
       break;
     case "kinesis":
       
@@ -22,8 +23,8 @@ public class SchlossSourceFactory {
       throw new NotImplementedException("Cannot handle source of type: " + type); 
 
     }
-    return schlossSource;
+    return workerSource;
+    
   }
-
   
 }

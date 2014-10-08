@@ -88,7 +88,7 @@ public class ShardProducerTest {
     
     _log.info("Total messages on producer queues: " + receivedMessages.size());
     
-    assertEquals(695, receivedMessages.size());
+    assertEquals(1000, receivedMessages.size());
     shardProducerService.stop();
   }
   

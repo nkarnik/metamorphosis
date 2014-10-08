@@ -173,7 +173,7 @@ public class LocalKafkaService implements KafkaService{
     ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(KafkaUtils.createConsumerConfig(getZKConnectString(), clientName));
 
     Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
-    topicCountMap.put(topic, new Integer(3)); // This consumer will only have one thread
+    topicCountMap.put(topic, new Integer(1)); // This consumer will only have one thread
     StringDecoder stringDecoder = new StringDecoder(new VerifiableProperties());
     KafkaStream<String,String> kafkaStream = consumer.createMessageStreams(topicCountMap, stringDecoder, stringDecoder).get(topic).get(0);
     ConsumerIterator<String, String> iterator = kafkaStream.iterator();

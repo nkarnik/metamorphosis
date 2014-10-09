@@ -2,7 +2,6 @@ package metamorphosis.workers.sinks;
 
 import metamorphosis.workers.Worker;
 import metamorphosis.workers.WorkerFactory;
-import metamorphosis.workers.sources.WorkerSink;
 import net.sf.json.JSONObject;
 
 import org.apache.commons.lang.NotImplementedException;

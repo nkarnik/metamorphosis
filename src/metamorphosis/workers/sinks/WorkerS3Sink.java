@@ -1,6 +1,5 @@
 package metamorphosis.workers.sinks;
 
-import metamorphosis.workers.sources.WorkerSink;
 import net.sf.json.JSONObject;
 
 public class WorkerS3Sink extends WorkerSink {

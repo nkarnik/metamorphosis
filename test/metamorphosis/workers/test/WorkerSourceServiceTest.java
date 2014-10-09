@@ -7,7 +7,7 @@ import java.util.concurrent.ExecutionException;
 
 import metamorphosis.kafka.LocalKafkaService;
 import metamorphosis.workers.WorkerService;
-import metamorphosis.workers.WorkerSource;
+import metamorphosis.workers.sources.WorkerSource;
 import metamorphosis.workers.sources.WorkerSourceService;
 import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;

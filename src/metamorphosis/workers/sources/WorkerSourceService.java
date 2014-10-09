@@ -9,7 +9,6 @@ import kafka.producer.ProducerConfig;
 import kafka.utils.TestUtils;
 import metamorphosis.kafka.KafkaService;
 import metamorphosis.workers.WorkerService;
-import metamorphosis.workers.WorkerSource;
 import net.sf.json.JSONObject;
 
 import org.apache.log4j.Logger;

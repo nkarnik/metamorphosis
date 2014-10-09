@@ -2,7 +2,6 @@ package metamorphosis.workers.sinks;
 
 import metamorphosis.kafka.KafkaService;
 import metamorphosis.workers.WorkerService;
-import metamorphosis.workers.sources.WorkerSink;
 import net.sf.json.JSONObject;
 
 public class WorkerSinkService extends WorkerService<WorkerSink> {

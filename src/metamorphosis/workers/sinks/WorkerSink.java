@@ -1,4 +1,4 @@
-package metamorphosis.workers.sources;
+package metamorphosis.workers.sinks;
 
 import metamorphosis.workers.Worker;
 

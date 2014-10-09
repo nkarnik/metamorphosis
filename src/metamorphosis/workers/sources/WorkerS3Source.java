@@ -6,7 +6,6 @@ import java.io.IOException;
 import metamorphosis.utils.BufferedReaderIterable;
 import metamorphosis.utils.s3.S3Exception;
 import metamorphosis.utils.s3.S3Util;
-import metamorphosis.workers.WorkerSource;
 import net.sf.json.JSONObject;
 
 import org.apache.log4j.Logger;

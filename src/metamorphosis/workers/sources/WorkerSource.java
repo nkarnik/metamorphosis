@@ -1,4 +1,6 @@
-package metamorphosis.workers;
+package metamorphosis.workers.sources;
+
+import metamorphosis.workers.Worker;
 
 public abstract class WorkerSource implements Worker {
 

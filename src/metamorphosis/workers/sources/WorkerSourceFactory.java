@@ -1,7 +1,6 @@
 package metamorphosis.workers.sources;
 
 import metamorphosis.workers.WorkerFactory;
-import metamorphosis.workers.WorkerSource;
 import net.sf.json.JSONObject;
 
 import org.apache.commons.lang.NotImplementedException;

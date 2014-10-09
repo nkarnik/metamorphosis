@@ -91,7 +91,7 @@ public class Config implements Serializable {
     _singleton._props.clear();
   }
 
-  private final synchronized <T extends Object> void put(String key, T val) {
+  public final synchronized <T extends Object> void put(String key, T val) {
     this._props.put(key, val);
   }
 

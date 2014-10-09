@@ -105,5 +105,7 @@ public class KafkaService implements Serializable{
     ZkClient client = createZKClient();
     AdminUtils.createTopic(client, topic, partitions, replicationFactor, new Properties());
     client.close();
+    _log.info("Topic created: " + topic + " with " + partitions + " partitions and replication: " + replicationFactor);
+
   }
 }

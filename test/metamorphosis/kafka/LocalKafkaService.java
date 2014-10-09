@@ -88,15 +88,15 @@ public class LocalKafkaService extends KafkaService{
   /** 
    * Create a new topic on the service 
    */
+  @Override
   public void createTopic(String topic, int partitions, int replicationFactor){
     // create topic
-    ZkClient client = createZKClient();
-    AdminUtils.createTopic(client, topic, partitions, replicationFactor, new Properties());
-    client.close();
+    super.createTopic(topic, partitions, replicationFactor);
+    // Test can wait until the metadata is appropriately propagated through the cluster
     for(int i = 0; i < partitions; i++){
       TestUtils.waitUntilMetadataIsPropagated(scala.collection.JavaConversions.asScalaBuffer(_servers), topic, i, 5000);  
     }
-    _log.info("Topic created: " + topic + " with " + partitions + " partitions and replication: " + replicationFactor);
+    _log.info("New topic's metadata is propagated");
   }
 
   protected ZkClient createZKClient() {

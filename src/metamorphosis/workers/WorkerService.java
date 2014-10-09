@@ -34,7 +34,7 @@ public abstract class WorkerService<T extends Worker> {
   protected static final long SLEEP_BETWEEN_READS = 30 * 1000;
   private static AtomicBoolean isRunning;
   private Logger _log = Logger.getLogger(WorkerService.class);
-  private String _sourceTopic;
+  public String _sourceTopic;
   private Future<String> _pushThread;
   private Future<Object> _popThread;
   private static ExecutorService _executorPool =  new ThreadPoolExecutor(5, 10, 1, TimeUnit.HOURS, new SynchronousQueue<Runnable>());

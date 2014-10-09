@@ -62,6 +62,7 @@ public class WorkerSinkServiceTest {
     .key("topic").value(TOPIC_TO_SINK)
     .key("sink").object()
         .key("type").value("s3")
+        .key("retry").value(0)
         .key("config").object()
           .key("shard_path").value("test/single_worker/")
           .key("shard_prefix").value("test_shard_")

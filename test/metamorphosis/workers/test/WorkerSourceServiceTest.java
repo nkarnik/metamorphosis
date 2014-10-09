@@ -15,13 +15,13 @@ import org.apache.log4j.Logger;
 import org.junit.Before;
 import org.junit.Test;
 
-public class WorkerServiceTest {
+public class WorkerSourceServiceTest {
   
   private ArrayList<String> _workerQueues;
   private LocalKafkaService _localKakfaService;
   private String PRODUCER_QUEUE_PREFIX = "producer_queue_";
   private int NUM_BROKERS = 3;
-  private Logger _log = Logger.getLogger(WorkerServiceTest.class);
+  private Logger _log = Logger.getLogger(WorkerSourceServiceTest.class);
   private String DESTINATION_TOPIC = "dest_topic";
 
   @Before

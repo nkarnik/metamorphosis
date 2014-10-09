@@ -3,22 +3,21 @@ package metamorphosis.workers.sources;
 import java.util.List;
 import java.util.Properties;
 
-import org.apache.log4j.Logger;
-
 import kafka.producer.KeyedMessage;
 import kafka.producer.Producer;
 import kafka.producer.ProducerConfig;
 import kafka.utils.TestUtils;
+import metamorphosis.kafka.KafkaService;
+import metamorphosis.workers.WorkerService;
+import metamorphosis.workers.WorkerSource;
+import net.sf.json.JSONObject;
+
+import org.apache.log4j.Logger;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 
-import metamorphosis.kafka.KafkaService;
-import metamorphosis.workers.Worker;
-import metamorphosis.workers.WorkerService;
-import net.sf.json.JSONObject;
-
-public class WorkerSourceService extends WorkerService {
+public class WorkerSourceService extends WorkerService<WorkerSource> {
 
   private Logger _log = Logger.getLogger(WorkerSourceService.class);
   
@@ -28,7 +27,7 @@ public class WorkerSourceService extends WorkerService {
 
   @Override
   protected void processMessage(final JSONObject poppedMessage) {
-    Worker workerSource = _workerFactory.createWorker(poppedMessage);
+    WorkerSource workerSource = _workerFactory.createWorker(poppedMessage);
     Iterable<String> messageIterator = workerSource.getMessageIterator();
     produceDataToTopic(messageIterator, workerSource.getTopic());
   }

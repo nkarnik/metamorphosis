@@ -1,9 +1,9 @@
 package metamorphosis.workers.sinks;
 
+import metamorphosis.workers.sources.WorkerSink;
 import net.sf.json.JSONObject;
-import metamorphosis.workers.Worker;
 
-public class WorkerS3Sink implements Worker {
+public class WorkerS3Sink extends WorkerSink {
 
   public WorkerS3Sink(JSONObject message) {
     // TODO Auto-generated constructor stub

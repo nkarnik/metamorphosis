@@ -3,7 +3,7 @@ package metamorphosis.workers;
 import net.sf.json.JSONObject;
 
 
-public interface WorkerFactory {
+public interface WorkerFactory<T extends Worker> {
 
-  public Worker createWorker(JSONObject message);
+  public T createWorker(JSONObject message) ;
 }

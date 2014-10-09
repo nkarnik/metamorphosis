@@ -30,12 +30,8 @@ import kafka.javaapi.TopicMetadataResponse;
 import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.javaapi.message.ByteBufferMessageSet;
 import kafka.message.MessageAndOffset;
-import kafka.producer.Producer;
-import kafka.producer.ProducerConfig;
 
 import org.apache.log4j.Logger;
-
-import com.google.common.base.Joiner;
 
 public class KafkaUtils {
 

@@ -1,22 +1,22 @@
 package metamorphosis.workers.sources;
 
-import metamorphosis.workers.Worker;
 import metamorphosis.workers.WorkerFactory;
+import metamorphosis.workers.WorkerSource;
 import net.sf.json.JSONObject;
 
 import org.apache.commons.lang.NotImplementedException;
 
-public class WorkerSourceFactory implements WorkerFactory {
+public class WorkerSourceFactory implements WorkerFactory<WorkerSource> {
 
   public WorkerSourceFactory(){
     
   }
   
   @Override
-  public Worker createWorker(JSONObject message) {
+  public WorkerSource createWorker(JSONObject message) {
     
     String type = message.getJSONObject("source").getString("type");
-    Worker workerSource = null;
+    WorkerSource workerSource = null;
     switch(type){
     case "s3":
       workerSource = new WorkerS3Source(message);

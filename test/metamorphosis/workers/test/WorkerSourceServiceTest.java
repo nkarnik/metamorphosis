@@ -7,6 +7,7 @@ import java.util.concurrent.ExecutionException;
 
 import metamorphosis.kafka.LocalKafkaService;
 import metamorphosis.workers.WorkerService;
+import metamorphosis.workers.WorkerSource;
 import metamorphosis.workers.sources.WorkerSourceService;
 import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;
@@ -62,7 +63,7 @@ public class WorkerSourceServiceTest {
     String message = builder.toString();
     _localKakfaService.sendMessage(_workerQueues.get(0), message);
 
-    WorkerService workerService = new WorkerSourceService(_workerQueues.get(0), _localKakfaService);
+    WorkerService<WorkerSource> workerService = new WorkerSourceService(_workerQueues.get(0), _localKakfaService);
     workerService.start();
     Thread.sleep(5000); // Give 10 seconds for the worker to get the message
 

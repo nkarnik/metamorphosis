@@ -28,7 +28,7 @@ import net.sf.json.JSONObject;
 
 import org.apache.log4j.Logger;
 
-public abstract class WorkerService {
+public abstract class WorkerService<T extends Worker> {
   
   
   protected static final long SLEEP_BETWEEN_READS = 30 * 1000;
@@ -40,9 +40,9 @@ public abstract class WorkerService {
   private static ExecutorService _executorPool =  new ThreadPoolExecutor(5, 10, 1, TimeUnit.HOURS, new SynchronousQueue<Runnable>());
   private RoundRobinByTopicMessageQueue _topicMessageQueue = new RoundRobinByTopicMessageQueue();
   protected KafkaService _kafkaService;
-  protected WorkerFactory _workerFactory;
+  protected WorkerFactory<T> _workerFactory;
 
-  public WorkerService(String sourceTopic, KafkaService kafkaService, WorkerFactory workerFactory) {
+  public WorkerService(String sourceTopic, KafkaService kafkaService, WorkerFactory<T> workerFactory) {
     _kafkaService = kafkaService;
     _sourceTopic = sourceTopic;
     _workerFactory = workerFactory;

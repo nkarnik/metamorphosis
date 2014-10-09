@@ -6,13 +6,13 @@ import java.io.IOException;
 import metamorphosis.utils.BufferedReaderIterable;
 import metamorphosis.utils.s3.S3Exception;
 import metamorphosis.utils.s3.S3Util;
-import metamorphosis.workers.Worker;
+import metamorphosis.workers.WorkerSource;
 import net.sf.json.JSONObject;
 
 import org.apache.log4j.Logger;
 
 
-public class WorkerS3Source implements Worker {
+public class WorkerS3Source extends WorkerSource {
   
   private Logger _log = Logger.getLogger(WorkerS3Source.class);
   private JSONObject _message;

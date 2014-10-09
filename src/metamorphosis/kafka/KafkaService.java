@@ -25,12 +25,13 @@ public class KafkaService implements Serializable{
   private static Logger _log = Logger.getLogger(KafkaService.class);
 
   public KafkaService() {
+    
   }
   
 
   public List<String> getSeedBrokers() {
     if(_seedBrokers == null){
-      String brokerHostsString = Config.singleton().getOrException("buffer.kafka.brokers");
+      String brokerHostsString = Config.singleton().getOrException("kafka.brokers");
       _seedBrokers = Arrays.asList(brokerHostsString.split(","));
     }
     // Get brokers from start_gmb
@@ -44,8 +45,8 @@ public class KafkaService implements Serializable{
 
 
   public String getZKConnectString() {
-    String zookeeperHost = Config.singleton().getOrException("buffer.kafka.zookeeper.host");
-    String zookeeperPort = Config.singleton().getOrException("buffer.kafka.zookeeper.port");
+    String zookeeperHost = Config.singleton().getOrException("kafka.zookeeper.host");
+    String zookeeperPort = Config.singleton().getOrException("kafka.zookeeper.port");
 
     return zookeeperHost + ":" + zookeeperPort + "/kafka";
   }

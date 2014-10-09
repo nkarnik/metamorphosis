@@ -131,7 +131,7 @@ public final class Utils {
   }
   
   
-  private static List<Future> _futures = Lists.newLinkedList();
+  private static List<Future<Object>> _futures = Lists.newLinkedList();
   private static <T extends Future> T trackFuture(T future) {
     synchronized(_futures) {
       _futures.add(future);
@@ -141,7 +141,7 @@ public final class Utils {
   
   public static void killAllFutures() {
     synchronized(_futures) {
-      for(Future f : _futures) {
+      for(Future<Object> f : _futures) {
         if ( !f.isDone() && !f.isCancelled()) { 
           execLog.warn("killing future: " + f);
           f.cancel(true);
@@ -475,7 +475,7 @@ public final class Utils {
   }
   
   public static int shell(String[] command, final StringBuilder stdout, final StringBuilder stderr, MutableObject processCapture) throws InterruptedException, IOException {
-    return shell(Collections.EMPTY_MAP, command, stdout, stderr, processCapture);
+    return shell(Collections.<String, String> emptyMap(), command, stdout, stderr, processCapture);
   }
   public static int shell(String[] command, final StringBuilder stdout, final StringBuilder stderr) throws InterruptedException, IOException {
     return shell(command, stdout, stderr, null);

@@ -1,6 +1,5 @@
 package metamorphosis.workers.sinks;
 
-import metamorphosis.workers.Worker;
 import metamorphosis.workers.WorkerFactory;
 import net.sf.json.JSONObject;
 

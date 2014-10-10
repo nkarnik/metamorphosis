@@ -46,8 +46,14 @@ kafka_brokers_hosts_string = kafka_brokers.map{|b| b + ":#{DEFAULT_KAFKA_PORT}"}
 
 kafka_zookeeper = find_nodes(env, "kafka_zookeeper").first()
 
-metamorphosis_source_topic = "source_topic"
-metamorphosis_sink_topic = "sink_topic"
+metamorphosis_source_topic = "source_queue"
+metamorphosis_sink_topic = "sink_queue"
+
+
+worker_source_queues = "producer_queue_0,producer_queue_1"
+worker_sink_queues = "consumer_queue_0,consumer_queue_1"
+worker_source_queue = "producer_queue_0"
+worker_sink_queue = "consumer_queue_0"
 
 #To allow debugging from eclipse while running on vagrant/test/prod. add at the start of -Dexec.args="
 jvm_debug=""
@@ -60,11 +66,16 @@ mvn exec:exec -Dexec.classpathScope=\"compile\" -Dexec.executable=\"java\" \
 metamorphosis.MetamorphosisService\
  --kafka.brokers #{kafka_brokers_hosts_string}\
  --kafka.zookeeper.host #{kafka_zookeeper}\
- --schloss.source.topic #{metamorphosis_source_topic}\
- --schloss.sink.topic #{metamorphosis_sink_topic}\
+ --schloss.source.queue #{metamorphosis_source_topic}\
+ --schloss.sink.queue #{metamorphosis_sink_topic}\
+ --worker.source.queues #{worker_source_queues}\
+ --worker.sink.queues #{worker_sink_queues}\
+ --worker.source.queue #{worker_source_queue}\
+ --worker.sink.queue #{worker_sink_queue}\
+ --service #{service}\
 \"
 CMD
 puts command
+system command
 
- # --worker.source.queues #{worker_source_queues}\
- # --worker.sink.queues #{worker_sink_queues}\
+

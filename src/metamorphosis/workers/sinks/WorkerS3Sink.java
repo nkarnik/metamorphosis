@@ -58,7 +58,7 @@ public class WorkerS3Sink extends WorkerSink {
     _bytesFetched = 0;
 
     //_shardFull = _topicToRead + queueNumber + sinkObject.getInt("retry")
-    _gzFileToWrite = _topicToRead + ".gz";
+    _gzFileToWrite = "/tmp/" + _topicToRead + ".gz";
     _log.info("Shard name is: " + _gzFileToWrite);
   }
 

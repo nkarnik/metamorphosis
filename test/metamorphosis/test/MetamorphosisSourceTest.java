@@ -160,23 +160,27 @@ public class MetamorphosisSourceTest {
     _schlossService.stop();
     _workerSinkService.stop();
     
+    int totalSunk = 0;
+    
     S3Object[] shards;
     try {
       shards = S3Util.listPath("buffer.zillabyte.com", "test/metamorphosis_test/");
       for (S3Object shard: shards) {
+        String shardPath = shard.getKey();
+        String shardBucket = shard.getBucketName();
         
-//      try {
-//        String[] shard = S3Util.readGzipFile(shard, shardPath).split("\n");
-//        totalSunk += shard.length;
-//        _log.info("Received a total of " + totalSunk + " bytes");
-//      } catch (IOException e) {
-//        // TODO Auto-generated catch block
-//        e.printStackTrace();
-//      }
+      try {
+        String[] sunk = S3Util.readGzipFile(shardBucket, shardPath).split("\n");
+        totalSunk += sunk.length;
+        _log.info("Received a total of " + totalSunk + " bytes");
+      } catch (IOException e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
+      }
         
       }
       
-//    assertEquals(10000, totalSunk);
+    assertEquals(10000, totalSunk);
       
     } catch (S3ServiceException e) {
       // TODO Auto-generated catch block

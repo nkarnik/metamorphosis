@@ -132,7 +132,7 @@ public class MetamorphosisSourceTest {
         .key("type").value("s3")
         .key("retry").value(0)
         .key("config").object()
-          .key("shard_path").value("test/metamorphosis_test1/")
+          .key("shard_path").value("test/metamorphosis_test2/")
           .key("shard_prefix").value("test_shard_")
           .key("bucket").value("buffer.zillabyte.com")
           .key("credentials").object()
@@ -153,7 +153,7 @@ public class MetamorphosisSourceTest {
     List<String> sunkShardPaths = Lists.newArrayList();
     for (int i = 0; i < 6; i++) {
       
-      String sunkShard = "test/metamorphosis_test1/some_topic0" + i;
+      String sunkShard = "test/metamorphosis_test2/some_topic0" + i;
       sunkShardPaths.add(sunkShard);
     }
     
@@ -165,7 +165,7 @@ public class MetamorphosisSourceTest {
         String[] shard = S3Util.readGzipFile("buffer.zillabyte.com", shardPath).split("\n");
         totalSunk += shard.length;
         _log.info("Received a total of " + totalSunk + " bytes");
-      } catch (IOException e) {
+      } catch (Exception e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
       }

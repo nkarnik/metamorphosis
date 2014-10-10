@@ -44,6 +44,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
   @Override
   protected void processMessage(JSONObject poppedMessage) {
     // TODO What do we do with this popped message?
+    _log.info("About to consume from sink topic");
     WorkerSink workerSink = _workerFactory.createWorker(poppedMessage);
     String topic = poppedMessage.getString("topic");
     ConsumerIterator<String, String> sinkTopicIterator = getSinkTopicIterator(topic);

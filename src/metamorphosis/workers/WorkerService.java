@@ -34,17 +34,19 @@ public abstract class WorkerService<T extends Worker> {
   protected static final long SLEEP_BETWEEN_READS = 30 * 1000;
   private static AtomicBoolean isRunning;
   private Logger _log = Logger.getLogger(WorkerService.class);
-  public String _sourceTopic;
+  public String _sourceTopic; //includes queue number
   private Future<String> _pushThread;
   private Future<Object> _popThread;
   private static ExecutorService _executorPool =  new ThreadPoolExecutor(5, 10, 1, TimeUnit.HOURS, new SynchronousQueue<Runnable>());
   private RoundRobinByTopicMessageQueue _topicMessageQueue = new RoundRobinByTopicMessageQueue();
   protected KafkaService _kafkaService;
   protected WorkerFactory<T> _workerFactory;
+  protected String _queueNumber;
 
   public WorkerService(String sourceTopic, KafkaService kafkaService, WorkerFactory<T> workerFactory) {
     _kafkaService = kafkaService;
     _sourceTopic = sourceTopic;
+    _queueNumber = _sourceTopic.substring(_sourceTopic.length() - 1, _sourceTopic.length());
     _workerFactory = workerFactory;
   }
 

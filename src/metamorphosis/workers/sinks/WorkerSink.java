@@ -22,7 +22,7 @@ public abstract class WorkerSink implements Worker {
 
 
 
-  public abstract void sink(ConsumerIterator<String, String> sinkTopicIterator);
+  public abstract void sink(ConsumerIterator<String, String> sinkTopicIterator, String _queueNumber);
 
 
 

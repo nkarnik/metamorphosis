@@ -35,6 +35,7 @@ import com.google.common.collect.Lists;
 public class WorkerSinkService extends WorkerService<WorkerSink> {
 
   private Logger _log = Logger.getLogger(WorkerSinkService.class);
+  private ConsumerConnector _consumer;
 
   public WorkerSinkService(String sourceTopic, KafkaService kafkaService) {
     super(sourceTopic, kafkaService, new WorkerSinkFactory());
@@ -46,7 +47,11 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
     WorkerSink workerSink = _workerFactory.createWorker(poppedMessage);
     String topic = poppedMessage.getString("topic");
     ConsumerIterator<String, String> sinkTopicIterator = getSinkTopicIterator(topic);
-    workerSink.sink(sinkTopicIterator);
+    workerSink.sink(sinkTopicIterator, _queueNumber);
+    
+    _log.info("Shutting down consumer: " + _consumer.hashCode());
+    _consumer.shutdown();
+    //streaming sink, so have to increment retry and push back to worker queue
     int retry = 1 + poppedMessage.getJSONObject("sink").getInt("retry");
     poppedMessage.getJSONObject("sink").element("retry", retry);
     
@@ -64,12 +69,12 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
   private ConsumerIterator<String, String> getSinkTopicIterator(String topicName) {
     String clientName = topicName;
     ConsumerConfig consumerConfig = KafkaUtils.createConsumerConfig(_kafkaService.getZKConnectString(), clientName);
-    ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(consumerConfig);
-
+    _consumer = kafka.consumer.Consumer.createJavaConsumerConnector(consumerConfig);
+    _log.info("New consumer created: " + _consumer.hashCode());
     Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
     topicCountMap.put(topicName, new Integer(1)); // This consumer will only have one thread
     StringDecoder stringDecoder = new StringDecoder(new VerifiableProperties());
-    KafkaStream<String,String> kafkaStream = consumer.createMessageStreams(topicCountMap, stringDecoder, stringDecoder).get(topicName).get(0);
+    KafkaStream<String,String> kafkaStream = _consumer.createMessageStreams(topicCountMap, stringDecoder, stringDecoder).get(topicName).get(0);
     ConsumerIterator<String, String> iterator = kafkaStream.iterator();
     _log.info("Consumer " + clientName + " instantiated");
     return iterator;

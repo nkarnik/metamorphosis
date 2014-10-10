@@ -38,22 +38,25 @@ public class WorkerS3Sink extends WorkerSink {
   private BufferedWriter _writer;
 
   private GZIPOutputStream _zip;
+
+  private JSONObject _sinkObject;
   
-  private static int fetchSize = 15000;
+  private static int fetchSize = 5000;
 
   public WorkerS3Sink(JSONObject message) {
     // TODO Auto-generated constructor stub
     _message = message;
-    JSONObject sourceObject = _message.getJSONObject("sink");
-    JSONObject config = sourceObject.getJSONObject("config");
+    _sinkObject = _message.getJSONObject("sink");
+    JSONObject config = _sinkObject.getJSONObject("config");
     _bucketName = config.getString("bucket");
     _shardPath = config.getString("shard_path");
     _shardPrefix = config.getString("shard_prefix");
     _shardFull = _shardPath + _shardPrefix + "2";
     _topicToRead = message.getString("topic");
-    _sinkType = sourceObject.getString("type");
+    _sinkType = _sinkObject.getString("type");
     _bytesFetched = 0;
-    //_gzFileToWrite = _topicToRead + _shardPath + _shardPrefix + ".gz";
+
+    //_shardFull = _topicToRead + queueNumber + sinkObject.getInt("retry")
     _gzFileToWrite = _topicToRead + ".gz";
     _log.info("Shard name is: " + _gzFileToWrite);
   }
@@ -66,9 +69,9 @@ public class WorkerS3Sink extends WorkerSink {
   }
 
   @Override
-  public void sink(ConsumerIterator<String, String> iterator) {
+  public void sink(ConsumerIterator<String, String> iterator, String queueNumber) {
     
-    
+    _shardFull = _shardPath + _topicToRead + queueNumber + _sinkObject.getInt("retry");
     
     try {
       _file = new File(_gzFileToWrite);
@@ -78,6 +81,7 @@ public class WorkerS3Sink extends WorkerSink {
       _writer = new BufferedWriter(new OutputStreamWriter(_zip, "UTF-8"));
       while (iterator.hasNext()) {
         
+        _log.info("Consumer iterator info: " + iterator.clientId());
         MessageAndMetadata<String, String> fetchedMessage = iterator.next();
         _log.info("Retreived message offset to sink from topic " + _topicToRead + " is " + fetchedMessage.offset());
         String messageBody = fetchedMessage.message();
@@ -89,6 +93,7 @@ public class WorkerS3Sink extends WorkerSink {
         if (maybeFlush()) {
           _log.info("Flushed shard to S3");
           _writer.close();
+          
           return;
         }
         
@@ -108,8 +113,6 @@ public class WorkerS3Sink extends WorkerSink {
           _log.info(e.getStackTrace());
         }
     }
-    
-    //S3Util
     
     
     

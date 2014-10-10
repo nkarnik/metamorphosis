@@ -48,7 +48,6 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
     String topic = poppedMessage.getString("topic");
     ConsumerIterator<String, String> sinkTopicIterator = getSinkTopicIterator(topic);
     workerSink.sink(sinkTopicIterator, _queueNumber);
-    
     _log.info("Shutting down consumer: " + _consumer.hashCode());
     _consumer.shutdown();
     //streaming sink, so have to increment retry and push back to worker queue

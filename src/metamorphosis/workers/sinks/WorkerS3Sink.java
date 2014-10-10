@@ -10,6 +10,7 @@ import java.util.zip.GZIPOutputStream;
 import org.apache.log4j.Logger;
 
 import kafka.consumer.ConsumerIterator;
+import kafka.consumer.ConsumerTimeoutException;
 import kafka.message.MessageAndMetadata;
 import metamorphosis.utils.KafkaUtils;
 import metamorphosis.utils.s3.S3Exception;
@@ -79,25 +80,25 @@ public class WorkerS3Sink extends WorkerSink {
     
       _zip = new GZIPOutputStream(new FileOutputStream(_file));
       _writer = new BufferedWriter(new OutputStreamWriter(_zip, "UTF-8"));
-      while (iterator.hasNext()) {
-        
-        _log.info("Consumer iterator info: " + iterator.clientId());
-        MessageAndMetadata<String, String> fetchedMessage = iterator.next();
-        _log.info("Retreived message offset to sink from topic " + _topicToRead + " is " + fetchedMessage.offset());
-        String messageBody = fetchedMessage.message();
-        int messageSize = messageBody.getBytes("UTF-8").length;
-        _bytesFetched += messageSize;
-        _writer.append(messageBody);
-        _writer.newLine();
-        _writer.flush();
-        if (maybeFlush()) {
-          _log.info("Flushed shard to S3");
-          _writer.close();
-          
-          return;
+      try{
+        while (iterator.hasNext()) {
+          MessageAndMetadata<String, String> fetchedMessage = iterator.next();
+          _log.info("Consumer ("+ iterator.clientId() + ") Retreived message offset to sink from topic " + _topicToRead + " is " + fetchedMessage.offset());
+          String messageBody = fetchedMessage.message();
+          int messageSize = messageBody.getBytes("UTF-8").length;
+          _bytesFetched += messageSize;
+          _writer.append(messageBody);
+          _writer.newLine();
+          _writer.flush();
+          if (maybeFlush(false)) {
+            _log.info("Flushed shard to S3");
+            _writer.close();
+            return;
+          }
         }
-        
-        
+      }catch(ConsumerTimeoutException e){
+        _log.info("Consumer timed out, flushing for sure");
+        maybeFlush(true);
       }
     }
     catch (IOException ioe) {
@@ -113,36 +114,25 @@ public class WorkerS3Sink extends WorkerSink {
           _log.info(e.getStackTrace());
         }
     }
-    
-    
-    
   }
   
 
   
-  protected boolean maybeFlush() {
+  protected boolean maybeFlush(boolean forceFlush) {
     
     _log.info("Fetched " +_bytesFetched + " so far...");
     
-    if (_bytesFetched > fetchSize) {
+    if (forceFlush || (_bytesFetched > 0 && _bytesFetched > fetchSize)) {
       try {
         _writer.close();
         _log.info("File path is: " + _file.getAbsolutePath() + " with length " + _file.length());
         S3Util.copyFile(_file, _bucketName, _shardFull);
-        Thread.sleep(2000);
+        _log.info("Copied " + _file.getAbsolutePath() + " to " + _shardFull);
         return true;
-      } catch (S3Exception e) {
-        _log.info(e.getStackTrace());
+      } catch (S3Exception | IOException e) {
+        _log.error("Flush failed: ", e);
         return false;
-      } catch (InterruptedException e) {
-        // TODO Auto-generated catch block
-        _log.info(e.getStackTrace());
-      } catch (IOException e) {
-        // TODO Auto-generated catch block
-        _log.info(e.getStackTrace());
       }
-      
-      
     }
     
     return false;

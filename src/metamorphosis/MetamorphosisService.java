@@ -31,7 +31,8 @@ public class MetamorphosisService {
 
   @SuppressWarnings("static-access")
   public static void main(String[] args) throws ParseException {
- // Command line options
+    
+
     CommandLineParser parser = new GnuParser();
     Options availOptions = new Options();
     new Config();
@@ -135,7 +136,7 @@ public class MetamorphosisService {
     Config.singleton().put("kafka.service", kafkaService);
     
     System.out.println(Config.singleton().toString());
-    
+    _log.info("Starting service: " + service);
     switch(service){
     case "schloss":
       if( !options.hasOption(schlossSourceQueue) || 

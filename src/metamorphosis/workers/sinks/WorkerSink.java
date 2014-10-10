@@ -24,9 +24,6 @@ public abstract class WorkerSink implements Worker {
 
   public abstract void sink(ConsumerIterator<String, String> sinkTopicIterator);
 
-  public void pushBackToWorkerQueue(JSONObject poppedMessage, String queueName) {
-    int retry = 1 + poppedMessage.getJSONObject("sink").getInt("retry");
-    poppedMessage.getJSONObject("sink").element("retry", retry);
-  }
+
 
 }

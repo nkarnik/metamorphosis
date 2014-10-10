@@ -46,11 +46,12 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
     poppedMessage.getJSONObject("sink").element("retry", retry);
     
     List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
-    messages.add(new KeyedMessage<Integer,String>(_sourceTopic,poppedMessage.toString()));
+    messages.add(new KeyedMessage<Integer,String>(_sourceTopic, poppedMessage.toString()));
     
     Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_kafkaService.getSeedBrokers()), "kafka.producer.DefaultPartitioner");
     Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
     producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
+    _log.info("Sending message: " + poppedMessage.toString() + " to topic: " + _sourceTopic);
     producer.close(); 
 
   }

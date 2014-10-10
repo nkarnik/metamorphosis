@@ -61,7 +61,9 @@ jvm_debug=""
 
 command = <<-CMD       
 mvn clean compile assembly:single; cd target;\
-java -jar #{jvm_debug} -Xmx8g \
+mvn exec:exec -Dexec.classpathScope=\"compile\" -Dexec.executable=\"java\" \
+-Dexec.args=\"#{jvm_debug} -Xmx8g -classpath %classpath \
+metamorphosis.MetamorphosisService\
  --kafka.brokers #{kafka_brokers_hosts_string}\
  --kafka.zookeeper.host #{kafka_zookeeper}\
  --schloss.source.queue #{metamorphosis_source_topic}\
@@ -70,7 +72,8 @@ java -jar #{jvm_debug} -Xmx8g \
  --worker.sink.queues #{worker_sink_queues}\
  --worker.source.queue #{worker_source_queue}\
  --worker.sink.queue #{worker_sink_queue}\
- --service #{service}
+ --service #{service}\
+\"
 CMD
 puts command
 system command

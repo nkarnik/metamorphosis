@@ -110,6 +110,13 @@ public class S3Util {
     
   }
   
+  public static void deletePath(String bucket, String key) throws S3ServiceException, S3Exception{
+    S3Object[] files = listPath(bucket, key);
+    for(S3Object file: files){
+      deleteFile(file);
+    }
+  }
+  
   public static String readFile(String bucket, String key) throws IOException {
   
     try {

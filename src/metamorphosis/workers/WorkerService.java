@@ -36,7 +36,7 @@ public abstract class WorkerService<T extends Worker> {
   public String _sourceTopic; //includes queue number
   private Future<Void> _pushThread;
   private Future<Void> _popThread;
-  private static ExecutorService _executorPool =  Executors.newFixedThreadPool(10); //(5, 10, 1, TimeUnit.HOURS, new SynchronousQueue<Runnable>());
+  private ExecutorService _executorPool =  Executors.newFixedThreadPool(10); //(5, 10, 1, TimeUnit.HOURS, new SynchronousQueue<Runnable>());
   private RoundRobinByTopicMessageQueue _topicMessageQueue = new RoundRobinByTopicMessageQueue();
   protected KafkaService _kafkaService;
   protected WorkerFactory<T> _workerFactory;
@@ -74,7 +74,7 @@ public abstract class WorkerService<T extends Worker> {
               continue; // Happens when the pop is interrupted
             }
             //Using the executorPool's internal q to send in callables
-            _log.info("passing to executor: " + poppedMessage.toString());
+            _log.info(this + " is passing to executor: " + poppedMessage.toString());
             
             _executorPool.submit(new Callable<String>(){
               @Override

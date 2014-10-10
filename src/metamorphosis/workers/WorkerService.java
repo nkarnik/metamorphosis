@@ -5,9 +5,8 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -35,9 +34,9 @@ public abstract class WorkerService<T extends Worker> {
   private static AtomicBoolean isRunning;
   private Logger _log = Logger.getLogger(WorkerService.class);
   public String _sourceTopic; //includes queue number
-  private Future<String> _pushThread;
-  private Future<Object> _popThread;
-  private static ExecutorService _executorPool =  new ThreadPoolExecutor(5, 10, 1, TimeUnit.HOURS, new SynchronousQueue<Runnable>());
+  private Future<Void> _pushThread;
+  private Future<Void> _popThread;
+  private static ExecutorService _executorPool =  Executors.newFixedThreadPool(10); //(5, 10, 1, TimeUnit.HOURS, new SynchronousQueue<Runnable>());
   private RoundRobinByTopicMessageQueue _topicMessageQueue = new RoundRobinByTopicMessageQueue();
   protected KafkaService _kafkaService;
   protected WorkerFactory<T> _workerFactory;
@@ -61,24 +60,29 @@ public abstract class WorkerService<T extends Worker> {
   
   
   public void startRoundRobinPopThread(){
-    _popThread = Utils.run(new Callable<Object>(){
+    _popThread = Utils.run(new Callable<Void>(){
 
       @Override
-      public Object call() throws InterruptedException  {
+      public Void call() throws InterruptedException  {
         _log.info("Entering round robin pop thread");
         while(isRunning.get()){
           //Blocking pop
           _log.info("About to pop from round robin...");
           try {
             final JSONObject poppedMessage = _topicMessageQueue.pop();
+            if(poppedMessage == null){
+              continue; // Happens when the pop is interrupted
+            }
             //Using the executorPool's internal q to send in callables
             _log.info("passing to executor: " + poppedMessage.toString());
             
-            _executorPool.submit(new Callable<Object>(){
+            _executorPool.submit(new Callable<String>(){
               @Override
-              public Object call() throws Exception {
+              public String call() throws Exception {
                 _log.info("Processing message: " + poppedMessage.toString());
                 processMessage(poppedMessage);
+                _log.info("Completed processing message: " + poppedMessage.toString());
+                
                 return null;
               }
             });
@@ -96,11 +100,11 @@ public abstract class WorkerService<T extends Worker> {
   protected abstract void processMessage(final JSONObject poppedMessage);
   
   
-  public Future<String> startRoundRobinPushRead() {
+  public Future<Void> startRoundRobinPushRead() {
     // Start while loop
-    _pushThread = Utils.run(new Callable<String>(){
+    _pushThread = Utils.run(new Callable<Void>(){
       @Override
-      public String call() throws Exception {
+      public Void call() throws Exception {
         _log.info("Entering worker service loop. Waiting on topic: " + _sourceTopic);
         // Create an iterator
         ConsumerIterator<String, JSONObject> iterator = getMessageTopicIterator();
@@ -153,6 +157,8 @@ public abstract class WorkerService<T extends Worker> {
         _log.info("Waiting on popThread termination");
         _popThread.get();
       }
+      _log.info("Shutting down executor pool");
+      _executorPool.shutdown();
       _log.info("Waiting 3 minutes on executor pool termination");
       _executorPool.awaitTermination(3, TimeUnit.MINUTES);
     } catch (InterruptedException | ExecutionException e) {

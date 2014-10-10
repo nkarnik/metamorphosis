@@ -57,6 +57,8 @@ public class SchlossService {
     _zkConnectString = Config.singleton().getOrException("kafka.zookeeper.connect");
     _sourceTopic = Config.singleton().getOrException("schloss.source.queue");
     _sinkTopic = Config.singleton().getOrException("schloss.sink.queue");
+    
+    
   }
   
   

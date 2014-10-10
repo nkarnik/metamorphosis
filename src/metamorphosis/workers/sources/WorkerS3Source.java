@@ -28,7 +28,7 @@ public class WorkerS3Source extends WorkerSource {
     JSONObject sourceObject = _message.getJSONObject("source");
     JSONObject config = sourceObject.getJSONObject("config");
     _bucketName = config.getString("bucket");
-    _shardPath = config.getString("manifest");
+    _shardPath = config.getString("shard_path");
     _topicToWrite = message.getString("topic");
     _sourceType = sourceObject.getString("type");
     

@@ -50,7 +50,7 @@ public class WorkerSourceServiceTest {
     .key("source").object()
         .key("type").value("s3")
         .key("config").object()
-          .key("manifest").value("data/homepages/2014/0620/1013632003/part_0002.gz")
+          .key("shard_path").value("data/homepages/2014/0620/1013632003/part_0002.gz")
           .key("bucket").value("fatty.zillabyte.com")
           .key("credentials").object()
             .key("secret").value("")

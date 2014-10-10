@@ -5,6 +5,8 @@ import java.util.List;
 
 import metamorphosis.utils.s3.S3Util;
 import net.sf.json.JSONObject;
+import net.sf.json.util.JSONBuilder;
+import net.sf.json.util.JSONStringer;
 
 import org.apache.log4j.Logger;
 
@@ -18,7 +20,7 @@ public class SchlossS3Source implements SchlossSource{
   private String _sourceType;
   private String _topicToWrite;
   private String _manifestPath;
-  private List<String> _manifestContents;
+  private List<String> _workerMessages;
   
   
   public SchlossS3Source(JSONObject message) {
@@ -29,20 +31,43 @@ public class SchlossS3Source implements SchlossSource{
     _manifestPath = config.getString("manifest");
     _topicToWrite = message.getString("topic");
     _sourceType = sourceObject.getString("type");
-    _manifestContents = null ;
-    try {
-      _manifestContents  = Lists.newArrayList(S3Util.readFile(_bucketName, _manifestPath).split("\n"));
-      _log.info("First manifest object is " + _manifestContents.get(0));
-    } catch (IOException e) {
-      _log.info("Failed to get s3 manifest path: " + _manifestPath);
-    }
+    
   }
 
 
   @Override
   public List<String> getWorkerMessages() {
+    _workerMessages = null ;
+    try {
+      String[] split = S3Util.readFile(_bucketName, _manifestPath).split("\n");
+      for(String line : split){
+     
+        //Build JSON to send as message
+        JSONBuilder builder = new JSONStringer();
+        builder.object()
+        .key("topic").value(_topicToWrite)
+        .key("source").object()
+            .key("type").value(_sourceType)
+            .key("config").object()
+              .key("manifest").value(line)
+              .key("bucket").value(_bucketName)
+              .key("credentials").object()
+                .key("secret").value("")
+                .key("access").value("")
+              .endObject()
+            .endObject()
+          .endObject()
+        .endObject();
+
+        String workerMessage = builder.toString();
+        _workerMessages.add(workerMessage);
+      }
+
+    } catch (IOException e) {
+      _log.info("Failed to get s3 manifest path: " + _manifestPath);
+    }
     // TODO Auto-generated method stub
-    return _manifestContents;
+    return _workerMessages;
   }
 
   

@@ -110,8 +110,6 @@ public abstract class WorkerService<T extends Worker> {
         
             // Blocking wait on source topic
             while(iterator.hasNext()){
-              _log.info("iterator has next");
-
               MessageAndMetadata<String, JSONObject> messageAndMeta = iterator.next();
               // TODO: Change this to use an executorPool
               _topicMessageQueue.push(messageAndMeta);
@@ -145,12 +143,18 @@ public abstract class WorkerService<T extends Worker> {
   public void stop(){
     isRunning.set(false);
     try {
-      _log.info("Waiting on pushThread termination");
-      _pushThread.get();
-      _log.info("Waiting on popThread termination");
-      _popThread.get();
-      _log.info("Waiting 10 seconds on executor pool termination");
-      _executorPool.awaitTermination(10, TimeUnit.SECONDS);
+      _log.info("Interrupting round robin pop...");
+      _topicMessageQueue.interrupt();
+      if(_pushThread != null && !_pushThread.isDone()){
+        _log.info("Waiting on pushThread termination");
+        _pushThread.get();
+      }
+      if(_popThread != null && !_popThread.isDone()){
+        _log.info("Waiting on popThread termination");
+        _popThread.get();
+      }
+      _log.info("Waiting 3 minutes on executor pool termination");
+      _executorPool.awaitTermination(3, TimeUnit.MINUTES);
     } catch (InterruptedException | ExecutionException e) {
       _log.error("Stop failed because: ", e);
     }

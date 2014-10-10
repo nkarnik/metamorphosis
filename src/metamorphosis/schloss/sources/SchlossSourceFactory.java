@@ -1,14 +1,13 @@
-package metamorphosis.schloss;
+package metamorphosis.schloss.sources;
 
-import metamorphosis.schloss.sources.SchlossS3Source;
-import metamorphosis.schloss.sources.SchlossSource;
+import metamorphosis.schloss.SchlossFactory;
 import net.sf.json.JSONObject;
 
 import org.apache.commons.lang.NotImplementedException;
 
-public class SchlossSourceFactory {
+public class SchlossSourceFactory implements SchlossFactory<SchlossSource>{
 
-  public static SchlossSource createSource(JSONObject message) {
+  public SchlossSource createSchlossDistributor(JSONObject message) {
     String type = message.getJSONObject("source").getString("type");
     SchlossSource schlossSource = null;
     switch(type){

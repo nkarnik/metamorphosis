@@ -4,12 +4,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeoutException;
-
-import org.apache.log4j.Logger;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import kafka.message.MessageAndMetadata;
 import metamorphosis.utils.Utils;
 import net.sf.json.JSONObject;
+
+import org.apache.log4j.Logger;
 
 public class RoundRobinByTopicMessageQueue {
   
@@ -18,6 +19,7 @@ public class RoundRobinByTopicMessageQueue {
   private int _queueNum;
   private ArrayList<String> _topics;
   private Logger _log = Logger.getLogger(RoundRobinByTopicMessageQueue.class);
+  private AtomicBoolean _interrupted;
 
   public RoundRobinByTopicMessageQueue() {
     
@@ -25,7 +27,7 @@ public class RoundRobinByTopicMessageQueue {
     _queueNum = 0;
     _remainingMessages = 0;
     _topics = new ArrayList<String>();
-    
+    _interrupted = new AtomicBoolean(false);
     
   }
   
@@ -44,9 +46,7 @@ public class RoundRobinByTopicMessageQueue {
     }else{
       queue = _queues.get(topic);
     }
-    queue.add(message);
-    _log.info("Adding to queue" + queue);
-    
+    queue.add(message);    
     _remainingMessages += 1;
     _log.info("Pushed message into round robin. Current remaining messages: " + _remainingMessages);
   }
@@ -60,13 +60,11 @@ public class RoundRobinByTopicMessageQueue {
     JSONObject popped = null;
     int topicsSeen = 0;
 
-    int numWaits = 0;
     do {
       _log.info("POP from queue number: " + _queueNum );
   
       if(_topics.size() == 0){
         _log .info("No topics in the round robin, waiting...");
-
         Utils.sleep(1000);
         continue;
       }
@@ -74,27 +72,26 @@ public class RoundRobinByTopicMessageQueue {
 
       ConcurrentLinkedQueue<JSONObject> concurrentLinkedQueue = _queues.get(currentTopic);
       popped =  concurrentLinkedQueue.poll();
-      
-      
+
       int size = _topics.size();
       _queueNum = (_queueNum == size - 1) ? 0 : _queueNum + 1;
       topicsSeen++;
       
       if(topicsSeen == size){
-        numWaits++;
-        if(numWaits > 10){
-          throw new TimeoutException("Done waiting for a while to pop");
-        }
         _log .info("No messages in the round robin, waiting...");
         topicsSeen = 0;
         Utils.sleep(1000);
       }
       
-    } while (popped == null );
+    } while (popped == null && !_interrupted.get() );
     _remainingMessages -= 1;
     _log.info("Popped message from round robin. Current remaining messages: " + _remainingMessages);
 
     return popped;
+  }
+  
+  public void interrupt(){
+    _interrupted.set(true);
   }
   
   public int remainingMessages() {

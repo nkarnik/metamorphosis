@@ -1,15 +1,9 @@
 package metamorphosis.workers.sinks;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-
-import org.apache.log4j.Logger;
-
-import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
 
 import kafka.consumer.ConsumerConfig;
 import kafka.consumer.ConsumerIterator;
@@ -22,7 +16,6 @@ import kafka.serializer.StringDecoder;
 import kafka.utils.TestUtils;
 import kafka.utils.VerifiableProperties;
 import metamorphosis.kafka.KafkaService;
-import metamorphosis.utils.JSONDecoder;
 import metamorphosis.utils.KafkaUtils;
 import metamorphosis.workers.WorkerService;
 import net.sf.json.JSONObject;

@@ -119,11 +119,8 @@ public class WorkerS3Sink extends WorkerSink {
 
   
   protected boolean maybeFlush(boolean forceFlush) {
-    
     _log.info("Fetched " +_bytesFetched + " so far...");
-    
-
-    if (forceFlush || (_bytesFetched > 0 && _bytesFetched > MIN_SHARD_SIZE)) {
+    if (_bytesFetched > 0 && (forceFlush || _bytesFetched > MIN_SHARD_SIZE)) {
       try {
         _writer.close();
         _log.info("File path is: " + _file.getAbsolutePath() + " with length " + _file.length());
@@ -135,10 +132,7 @@ public class WorkerS3Sink extends WorkerSink {
         return false;
       }
     }
-    
     return false;
-
-    
   }
   
   

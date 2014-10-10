@@ -52,8 +52,8 @@ public class SchlossService {
     
     _brokers = Lists.newArrayList(((String) Config.singleton().getOrException("kafka.brokers")).split(","));
     _zkConnectString = Config.singleton().getOrException("kafka.zookeeper.connect");
-    _sourceTopic = Config.singleton().getOrException("schloss.source.topic");
-    _sinkTopic = Config.singleton().getOrException("schloss.source.topic");
+    _sourceTopic = Config.singleton().getOrException("schloss.source.queue");
+    _sinkTopic = Config.singleton().getOrException("schloss.sink.queue");
   }
   
   
@@ -113,7 +113,7 @@ public class SchlossService {
     
     @Override
     public String call() throws Exception {
-      _log.info("Entering schloss service loop");
+      _log.info("Entering schloss service loop for topic: " + _messageTopic);
       isRunning = new AtomicBoolean(true);
       // Create an iterator
       ConsumerIterator<String, JSONObject> iterator = getIterator(_messageTopic);

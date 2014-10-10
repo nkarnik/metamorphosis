@@ -1,5 +1,9 @@
 package metamorphosis;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+
 import metamorphosis.kafka.KafkaService;
 import metamorphosis.schloss.SchlossService;
 import metamorphosis.utils.CommandLine;
@@ -23,8 +27,7 @@ public class MetamorphosisService {
  // Command line options
     CommandLineParser parser = new GnuParser();
     Options availOptions = new Options();
-    Config config = new Config();
-    
+    new Config();
     availOptions.addOption(OptionBuilder
         .hasArg()
         .withLongOpt("service")
@@ -55,14 +58,14 @@ public class MetamorphosisService {
     
     availOptions.addOption(OptionBuilder
         .hasArg()
-        .withLongOpt("schloss.sink.topic")
+        .withLongOpt("schloss.sink.queue")
         .withType(String.class)
         .create()
         );
 
     availOptions.addOption(OptionBuilder
         .hasArg()
-        .withLongOpt("schloss.source.topic")
+        .withLongOpt("schloss.source.queue")
         .withType(String.class)
         .create()
         );
@@ -84,14 +87,14 @@ public class MetamorphosisService {
     
     availOptions.addOption(OptionBuilder
         .hasArg()
-        .withLongOpt("worker.sink.topic")
+        .withLongOpt("worker.sink.queue")
         .withType(String.class)
         .create()
         );
 
     availOptions.addOption(OptionBuilder
         .hasArg()
-        .withLongOpt("worker.source.topic")
+        .withLongOpt("worker.source.queue")
         .withType(String.class)
         .create()
         );
@@ -113,40 +116,42 @@ public class MetamorphosisService {
       return;
     }
 
-    config.put("kafka.brokers", options.getOptionValue("kafka.brokers", "192.168.111.107:9092,192.168.111.108:9092"));
+    Config.singleton().put("kafka.brokers", options.getOptionValue("kafka.brokers", "192.168.111.107:9092,192.168.111.108:9092"));
     String zkHost = options.getOptionValue("kafka.zookeeper.host", "192.168.111.106");
     String zkPort = options.getOptionValue("kafka.zookeeper.port", "2181");
-    config.put("kafka.zookeeper.host", zkHost);
-    config.put("kafka.zookeeper.port", zkPort);
-    config.put("kafka.zookeeper.connect",zkHost + ":" + zkPort + "/kafka");
+    Config.singleton().put("kafka.zookeeper.host", zkHost);
+    Config.singleton().put("kafka.zookeeper.port", zkPort);
+    Config.singleton().put("kafka.zookeeper.connect",zkHost + ":" + zkPort + "/kafka");
     String service = options.getOptionValue("service");
 
     KafkaService kafkaService = new KafkaService();
-    config.put("kafka.service", kafkaService);
+    Config.singleton().put("kafka.service", kafkaService);
     
-    System.out.println(config.toString());
+    System.out.println(Config.singleton().toString());
     
     switch(service){
     case "schloss":
-      if( !options.hasOption("schloss.source.topic") || 
-          !options.hasOption("schloss.sink.topic") || 
+      if( !options.hasOption("schloss.source.queue") || 
+          !options.hasOption("schloss.sink.queue") || 
           !options.hasOption("worker.sink.queues") || 
           !options.hasOption("worker.source.queues")){
         _log.error("Requested schloss service without the schloss source and sink topics");
         exitWithHelp(availOptions);
       }
-      config.put("schloss.source.topic", options.getOptionValue("schloss.source.topic"));
-      config.put("schloss.sink.topic", options.getOptionValue("schloss.sink.topic"));
+      Config.singleton().put("schloss.source.queue", options.getOptionValue("schloss.source.queue"));
+      Config.singleton().put("schloss.sink.queue", options.getOptionValue("schloss.sink.queue"));
+      Config.singleton().put("worker.source.queues", options.getOptionValue("worker.source.queues"));
+      Config.singleton().put("worker.sink.queues", options.getOptionValue("worker.sink.queues"));
       startSchlossService();
       break;
       
     case "worker":
-      if(!options.hasOption("worker.source.topic") || !options.hasOption("worker.sink.topic")){
-        _log.error("Requested schloss service without the schloss source and sink topics");
+      if(!options.hasOption("worker.source.queue") || !options.hasOption("worker.sink.queue")){
+        _log.error("Requested worker service without the worker source and sink queue name");
         exitWithHelp(availOptions);
       }
-      config.put("worker.source.topic", options.getOptionValue("worker.source.topic"));
-      config.put("worker.sink.topic", options.getOptionValue("worker.sink.topic"));
+      Config.singleton().put("worker.source.queue", options.getOptionValue("worker.source.queue"));
+      Config.singleton().put("worker.sink.queue", options.getOptionValue("worker.sink.queue"));
 
       startWorkerService(kafkaService);
       break;
@@ -157,24 +162,59 @@ public class MetamorphosisService {
         return;
     }
     
-    _log.info("Services started... ");
+    _log.info("Services started... press 'q' <enter> to quit");
     
   }
 
   private static void startWorkerService(KafkaService kafkaService) {
     _log.info("Starting worker services");
-    WorkerSourceService sourceService = new WorkerSourceService((String)Config.singleton().getOrException("worker.source.topic"), kafkaService);
-    WorkerSinkService sinkService = new WorkerSinkService((String)Config.singleton().getOrException("worker.sink.topic"), kafkaService);
+    WorkerSourceService sourceService = new WorkerSourceService((String)Config.singleton().getOrException("worker.source.queue"), kafkaService);
+    WorkerSinkService sinkService = new WorkerSinkService((String)Config.singleton().getOrException("worker.sink.queue"), kafkaService);
     sourceService.start();
     sinkService.start();
-
+    while(true){
+      String input = getInput();
+      if(input != null && input.equals("q")){
+        sourceService.stop();
+        sinkService.stop();
+        System.exit(1);
+      }else{
+        _log.info("Received input: " + input);
+      }
+    }
+    
   }
 
   private static void startSchlossService() {
     _log.info("Starting Schloss service");
     SchlossService schlossService = new  SchlossService();
     schlossService.start();
+    while(true){
+      String input = getInput();
+      if(input != null && input.equals("q")){
+        schlossService.stop();
+        System.exit(1);
+      }else{
+        _log.info("Received input: " + input);
+      }
+    }
+  }
+
+  private static String getInput() {
+    BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
     
+    try {
+      String input = null;
+      do{
+        System.out.print("> ");
+        input = br.readLine();
+      }while(input != null && input.trim().length() == 0);
+      return input;
+    } catch (IOException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+    return null;
   }
 
   private static void exitWithHelp(Options availOptions) {

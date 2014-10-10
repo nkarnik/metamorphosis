@@ -21,8 +21,8 @@ import com.google.common.collect.Lists;
 public class SchlossTest {
 
   private static final String PRODUCER_QUEUE_PREFIX = "producer_queue_";
-  private static final String SOURCE_TOPIC = "source_topic";
-  private static final String SINK_TOPIC = "sink_topic";
+  private static final String SOURCE_TOPIC = "source_queue";
+  private static final String SINK_TOPIC = "sink_queue";
   private static final int NUM_BROKERS = 3;
   private Logger _log = Logger.getLogger(SchlossTest.class);
   private LocalKafkaService _localKakfaService;
@@ -67,8 +67,8 @@ public class SchlossTest {
 
     // GMB sends message to schloss topic
     // create SchlossService
-    Config.singleton().put("schloss.source.topic", SOURCE_TOPIC);
-    Config.singleton().put("schloss.sink.topic", SINK_TOPIC);
+    Config.singleton().put("schloss.source.queue", SOURCE_TOPIC);
+    Config.singleton().put("schloss.sink.queue", SINK_TOPIC);
     Config.singleton().put("kafka.zookeeper.connect", _localKakfaService.getZKConnectString());
     Config.singleton().put("kafka.brokers", Joiner.on(",").join(_localKakfaService.getSeedBrokers()));
     Config.singleton().put("worker.source.queues", Joiner.on(",").join(_workerSourceQueues));

@@ -65,7 +65,7 @@ public class WorkerSourceServiceTest {
 
     WorkerService<WorkerSource> workerService = new WorkerSourceService(_workerQueues.get(0), _localKakfaService);
     workerService.start();
-    Thread.sleep(5000); // Give 10 seconds for the worker to get the message
+    Thread.sleep(10000); // Give 10 seconds for the worker to get the message
 
     _log.info("Waiting on future...");
     workerService.stop(); // Awaits executor pool to finish

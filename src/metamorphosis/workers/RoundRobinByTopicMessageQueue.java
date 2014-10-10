@@ -59,18 +59,22 @@ public class RoundRobinByTopicMessageQueue {
   public JSONObject pop() throws TimeoutException {
     JSONObject popped = null;
     int topicsSeen = 0;
-    while(_topics.size() == 0){
-      _log.info("No topics in round robin. Waiting on more topics: ");
-      Utils.sleep(500);
-    }
+
     int numWaits = 0;
     do {
       _log.info("POP from queue number: " + _queueNum );
-      String currentTopic = _topics.get(_queueNum);
   
-      
+      if(_topics.size() == 0){
+        _log .info("No topics in the round robin, waiting...");
+
+        Utils.sleep(1000);
+        continue;
+      }
+      String currentTopic = _topics.get(_queueNum);
+
       ConcurrentLinkedQueue<JSONObject> concurrentLinkedQueue = _queues.get(currentTopic);
       popped =  concurrentLinkedQueue.poll();
+      
       
       int size = _topics.size();
       _queueNum = (_queueNum == size - 1) ? 0 : _queueNum + 1;
@@ -85,6 +89,7 @@ public class RoundRobinByTopicMessageQueue {
         topicsSeen = 0;
         Utils.sleep(1000);
       }
+      
     } while (popped == null );
     _remainingMessages -= 1;
     _log.info("Popped message from round robin. Current remaining messages: " + _remainingMessages);

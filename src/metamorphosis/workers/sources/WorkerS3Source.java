@@ -42,7 +42,7 @@ public class WorkerS3Source extends WorkerSource {
       _brIterable = new BufferedReaderIterable(_bufferedShardReader);
       
     } catch (IOException | InterruptedException | S3Exception e) {
-      _log.info("Failed to get s3 manifest path: " + _shardPath);
+      _log.info("Failed to get s3 shard path: " + _shardPath);
     }  
     return _brIterable;
   }

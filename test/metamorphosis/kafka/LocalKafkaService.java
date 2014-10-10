@@ -166,7 +166,7 @@ public class LocalKafkaService extends KafkaService{
     try{
       while(iterator.hasNext()){
         String message = iterator.next().message();
-        _log.info("Next message is " + message.substring(0, 30) + "...");
+        //_log.info("Next message is " + message.substring(0, 30) + "...");
         messages.add(message);
       }
     }catch(ConsumerTimeoutException e){

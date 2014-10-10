@@ -61,7 +61,7 @@ public class SchlossService {
   public void start() {
     // Start while loop
     _sourceReadThread = Utils.run(new SchlossSourceReadThread(_sourceTopic));
-    _sinkReadThread = Utils.run(new SchlossSourceReadThread(_sinkTopic));
+    _sinkReadThread = Utils.run(new SchlossSinkReadThread(_sinkTopic));
   }
 
   
@@ -101,28 +101,30 @@ public class SchlossService {
  private abstract class SchlossReadThread implements Callable<String> {
     
     private String[] _workerQueues;
-    private String _messageTopic;
+    private String _messageQueue;
 
     public SchlossReadThread(String messageTopic, String targetWorkerQueues){
       String workerQueuesString = Config.singleton().getOrException(targetWorkerQueues);
       _workerQueues = workerQueuesString.split(",");
-      _messageTopic = messageTopic;
-    }
+      _messageQueue = messageTopic;
+      _log.info("Created read thread for queue: " + _messageQueue);
+    } 
     
     public abstract void distributeMessagesToQueues(String[] _workerQueues, List<String> workerQueueMessages);
     
     @Override
     public String call() throws Exception {
-      _log.info("Entering schloss service loop for topic: " + _messageTopic);
+      _log.info("Entering schloss service loop for topic: " + _messageQueue);
       isRunning = new AtomicBoolean(true);
       // Create an iterator
-      ConsumerIterator<String, JSONObject> iterator = getIterator(_messageTopic);
+      ConsumerIterator<String, JSONObject> iterator = getIterator(_messageQueue);
       while(isRunning.get()){
         try{
           // Blocking wait on source topic
           while(iterator.hasNext()){
             MessageAndMetadata<String, JSONObject> next = iterator.next();
             JSONObject message = next.message();
+            _log.info("Processing message: " + message.toString());
             SchlossSource schlossSource = SchlossSourceFactory.createSource(message);
             List<String> workerQueueMessages = schlossSource.getWorkerMessages();
             distributeMessagesToQueues(_workerQueues, workerQueueMessages);
@@ -150,7 +152,7 @@ public class SchlossService {
     for( String workerQueueMessage : workerQueueMessages) {
       int numQueues = _workerQueues.length;
       String workerQueueTopic = _workerQueues[_queueToPush % numQueues];
-      _log.info("Sending message " + workerQueueMessage + " to queue: " + workerQueueTopic);
+      _log.info("Distributing message  to queue: " + workerQueueTopic + " msg:: " + workerQueueMessage);
       messages.add(new KeyedMessage<Integer,String>(workerQueueTopic,workerQueueMessage));
       _queueToPush += 1;
     }
@@ -171,8 +173,11 @@ public class SchlossService {
   }
 
   @Override
-  public void distributeMessagesToQueues(String[] _workerQueues, List<String> workerQueueMessages) {
-    // Write to all topics?
+  public void distributeMessagesToQueues(String[] workerQueues, List<String> workerQueueMessages) {
+    // Write to all topics.
+    for(String workerSinkQ: workerQueues){
+      
+    }
     
   }
    

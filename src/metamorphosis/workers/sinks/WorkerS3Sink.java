@@ -41,7 +41,7 @@ public class WorkerS3Sink extends WorkerSink {
 
   private JSONObject _sinkObject;
   
-  private static int fetchSize = 5000;
+  private static int fetchSize = 20000;
 
   public WorkerS3Sink(JSONObject message) {
     // TODO Auto-generated constructor stub

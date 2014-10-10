@@ -1,5 +1,8 @@
 package metamorphosis.test;
 
+import static org.junit.Assert.assertEquals;
+
+import java.util.ArrayList;
 import java.util.List;
 
 import metamorphosis.kafka.LocalKafkaService;
@@ -10,6 +13,7 @@ import metamorphosis.workers.sources.WorkerSourceService;
 import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;
 
+import org.apache.log4j.Logger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -19,7 +23,7 @@ import com.google.common.collect.Lists;
 
 public class MetamorphosisSourceTest {
 
-  private static final int NUM_BROKERS = 2;
+  private static final int NUM_BROKERS = 1;
   private static final String SCHLOSS_SOURCE_QUEUE = "source_topic";
   private static final String SCHLOSS_SINK_QUEUE = "sink_topic";
   private static final String PRODUCER_QUEUE_PREFIX = "worker_source_queue_";
@@ -30,6 +34,9 @@ public class MetamorphosisSourceTest {
   private SchlossService _schlossService;
   private WorkerSourceService _workerSourceService;
   private WorkerSinkService _workerSinkService;
+  private String destinationTopic = "some_topic";
+  
+  private static Logger _log = Logger.getLogger(MetamorphosisSourceTest.class);
 
   @Before
   public void setup(){
@@ -39,6 +46,8 @@ public class MetamorphosisSourceTest {
     _localKakfaService = new LocalKafkaService(NUM_BROKERS);
     // Create required topics
     _localKakfaService.createTopic(SCHLOSS_SOURCE_QUEUE, 1, 1);
+    _localKakfaService.createTopic(SCHLOSS_SINK_QUEUE, 1, 1);
+
     for (int i = 0; i < NUM_BROKERS; i++) {
       _workerSourceQueues.add(PRODUCER_QUEUE_PREFIX + i);
       _workerSinkQueues.add(CONSUMER_QUEUE_PREFIX + i);
@@ -77,10 +86,9 @@ public class MetamorphosisSourceTest {
   }
   
   @Test
-  public void testSourceMessage(){
+  public void testSourceMessage() throws InterruptedException{
     
     JSONBuilder builder = new JSONStringer();
-    String destinationTopic = "some_topic";
     builder.object()
     .key("topic").value(destinationTopic)
     .key("source").object()
@@ -98,11 +106,39 @@ public class MetamorphosisSourceTest {
 
     String message = builder.toString();
     _localKakfaService.sendMessage(SCHLOSS_SOURCE_QUEUE, message);
+    _log.info("Sleeping 30 seconds");
+    Thread.sleep(90000);
     
+    List<String> receivedMessages = new ArrayList<String>(); 
+    List<String> messages = _localKakfaService.readStringMessagesInTopic(destinationTopic);
+    receivedMessages.addAll(messages);
+
+    _log.info("Total messages on producer queues: " + receivedMessages.size());   
+    assertEquals(10000, receivedMessages.size());
     
-  }
-  
-  public void testSinkMessage(){
+
+    JSONBuilder builderSink = new JSONStringer();
+    builderSink.object()
+    .key("topic").value(destinationTopic)
+    .key("sink").object()
+        .key("type").value("s3")
+        .key("retry").value(0)
+        .key("config").object()
+          .key("shard_path").value("test/metamorphosis_test1/")
+          .key("shard_prefix").value("test_shard_")
+          .key("bucket").value("buffer.zillabyte.com")
+          .key("credentials").object()
+            .key("secret").value("")
+            .key("access").value("")
+          .endObject()
+        .endObject()
+      .endObject()
+    .endObject();
+
+    String sinkMessage = builderSink.toString();
+    _localKakfaService.sendMessage(SCHLOSS_SINK_QUEUE, sinkMessage);
+    Thread.sleep(30000);
+    
     
   }
   

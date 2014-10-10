@@ -28,7 +28,7 @@ public class WorkerS3Source extends WorkerSource {
     JSONObject sourceObject = _message.getJSONObject("source");
     JSONObject config = sourceObject.getJSONObject("config");
     _bucketName = config.getString("bucket");
-    _shardPath = config.getString("manifest");
+    _shardPath = config.getString("shard_path");
     _topicToWrite = message.getString("topic");
     _sourceType = sourceObject.getString("type");
     
@@ -42,7 +42,7 @@ public class WorkerS3Source extends WorkerSource {
       _brIterable = new BufferedReaderIterable(_bufferedShardReader);
       
     } catch (IOException | InterruptedException | S3Exception e) {
-      _log.info("Failed to get s3 manifest path: " + _shardPath);
+      _log.info("Failed to get s3 shard path: " + _shardPath);
     }  
     return _brIterable;
   }

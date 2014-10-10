@@ -74,12 +74,12 @@ public class SchlossTest {
     Config.singleton().put("worker.source.queues", Joiner.on(",").join(_workerSourceQueues));
     Config.singleton().put("worker.sink.queues", Joiner.on(",").join(_workerSinkQueues));
     
+    _localKakfaService.sendMessage(SOURCE_TOPIC, message);
     SchlossService schlossService = new SchlossService();
     // run SchlossService
     schlossService.start();
     // verify that SchlossService fills producer_qs
-    _localKakfaService.sendMessage(SOURCE_TOPIC, message);
-    Thread.sleep(5000);
+    Thread.sleep(15000);
 
     _log.info("Reading messages for confirmation");
     List<String> receivedMessages = new ArrayList<String>();

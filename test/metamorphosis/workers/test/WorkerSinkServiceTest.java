@@ -28,7 +28,7 @@ public class WorkerSinkServiceTest {
   private String CONSUMER_QUEUE_PREFIX = "consumer_queue_";
   private int NUM_BROKERS = 3;
   private Logger _log = Logger.getLogger(WorkerSourceServiceTest.class);
-  private String TOPIC_TO_SINK = "to_be_sinked_topic";
+  private String TOPIC_TO_SINK = "more_test";
 
   @Before
   public void setup() {
@@ -64,6 +64,7 @@ public class WorkerSinkServiceTest {
     .key("topic").value(TOPIC_TO_SINK)
     .key("sink").object()
         .key("type").value("s3")
+        .key("retry").value(0)
         .key("config").object()
           .key("shard_path").value("test/single_worker/")
           .key("shard_prefix").value("test_shard_")
@@ -87,7 +88,7 @@ public class WorkerSinkServiceTest {
     
     WorkerService<WorkerSink> workerService = new WorkerSinkService(thisWorkerQueue, _localKakfaService);
     workerService.start();
-    Thread.sleep(5000); // Give 10 seconds for the worker to get the message
+    Thread.sleep(25000); // Give 10 seconds for the worker to get the message
 
     _log.info("Waiting on future...");
     workerService.stop(); // Awaits executor pool to finish

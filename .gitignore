@@ -1,4 +1,6 @@
 Gemfile.lock
+/tmp
+*.gz
 *.log*
 manifest
 *.template
@@ -11,7 +13,7 @@ logs
 *.orig
 *.jar
 *.log
-
+to_be*
 # Package Files #
 *.war
 *.ear

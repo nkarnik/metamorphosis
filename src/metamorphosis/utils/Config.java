@@ -92,7 +92,7 @@ public class Config implements Serializable {
   }
 
   public final synchronized <T extends Object> void put(String key, T val) {
-    this._props.put(key, val);
+    _singleton._props.put(key, val);
   }
 
 

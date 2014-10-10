@@ -133,7 +133,16 @@
 		</dependency>
 	</dependencies>
 	<build>
-		<sourceDirectory>src</sourceDirectory>
+		<resources>
+			<resource>
+				<directory>src/</directory>
+				<targetPath>${basedir}</targetPath>
+				<includes>
+					<include>log4j.properties</include>
+				</includes>
+			</resource>
+		</resources>
+		<sourceDirectory>src/</sourceDirectory>
 		<testSourceDirectory>src/</testSourceDirectory>
 		<plugins>
 			<plugin>

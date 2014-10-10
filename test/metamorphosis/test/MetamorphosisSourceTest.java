@@ -2,12 +2,14 @@ package metamorphosis.test;
 
 import static org.junit.Assert.assertEquals;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import metamorphosis.kafka.LocalKafkaService;
 import metamorphosis.schloss.SchlossService;
 import metamorphosis.utils.Config;
+import metamorphosis.utils.s3.S3Util;
 import metamorphosis.workers.sinks.WorkerSinkService;
 import metamorphosis.workers.sources.WorkerSourceService;
 import net.sf.json.util.JSONBuilder;
@@ -142,11 +144,37 @@ public class MetamorphosisSourceTest {
     .endObject();
     String sinkMessage = builderSink.toString();
     _localKakfaService.sendMessage(SCHLOSS_SINK_QUEUE, sinkMessage);
-    _log.info("Sleeping 10 seconds ...");
-    Thread.sleep(30000);
+    _log.info("Sleeping 70 seconds ...");
+    Thread.sleep(70000);
     
     _schlossService.stop();
     _workerSinkService.stop();
+    
+    List<String> sunkShardPaths = Lists.newArrayList();
+    for (int i = 0; i < 6; i++) {
+      
+      String sunkShard = "test/metamorphosis_test1/some_topic0" + i;
+      sunkShardPaths.add(sunkShard);
+    }
+    
+    int totalSunk = 0;
+    
+    for (String shardPath : sunkShardPaths) {
+      
+      try {
+        String[] shard = S3Util.readGzipFile("buffer.zillabyte.com", shardPath).split("\n");
+        totalSunk += shard.length;
+        _log.info("Received a total of " + totalSunk + " bytes");
+      } catch (IOException e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
+      }
+      
+    }
+    
+    assertEquals(10000, totalSunk);
+    
+    
   }
   
 }

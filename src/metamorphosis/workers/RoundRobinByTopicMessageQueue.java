@@ -61,13 +61,13 @@ public class RoundRobinByTopicMessageQueue {
     int topicsSeen = 0;
 
     do {
-      _log.info("POP from queue number: " + _queueNum );
   
       if(_topics.size() == 0){
         _log .info("No topics in the round robin, waiting...");
         Utils.sleep(1000);
         continue;
       }
+      //_log.info("POP from queue number: " + _queueNum );
       String currentTopic = _topics.get(_queueNum);
 
       ConcurrentLinkedQueue<JSONObject> concurrentLinkedQueue = _queues.get(currentTopic);

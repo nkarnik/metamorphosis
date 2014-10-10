@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import metamorphosis.kafka.LocalKafkaService;
+import metamorphosis.utils.Config;
 import metamorphosis.workers.WorkerService;
 import metamorphosis.workers.sinks.WorkerSink;
 import metamorphosis.workers.sinks.WorkerSinkService;
@@ -16,6 +17,7 @@ import org.apache.log4j.Logger;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 
 public class WorkerSinkServiceTest {
@@ -76,9 +78,15 @@ public class WorkerSinkServiceTest {
     .endObject();
 
     String message = builder.toString();
-    _localKakfaService.sendMessage(_workerQueues.get(0), message);
+    String thisWorkerQueue = _workerQueues.get(0);
+    _localKakfaService.sendMessage(thisWorkerQueue, message);
 
-    WorkerService<WorkerSink> workerService = new WorkerSinkService(_workerQueues.get(0), _localKakfaService);
+    // create SchlossService
+    Config.singleton().put("worker.sink.topic", thisWorkerQueue);
+    Config.singleton().put("kafka.zookeeper.connect", _localKakfaService.getZKConnectString());
+    Config.singleton().put("kafka.brokers", Joiner.on(",").join(_localKakfaService.getSeedBrokers()));
+    
+    WorkerService<WorkerSink> workerService = new WorkerSinkService(thisWorkerQueue, _localKakfaService);
     workerService.start();
     Thread.sleep(5000); // Give 10 seconds for the worker to get the message
 

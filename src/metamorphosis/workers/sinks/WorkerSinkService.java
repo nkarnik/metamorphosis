@@ -27,6 +27,11 @@ import metamorphosis.utils.KafkaUtils;
 import metamorphosis.workers.WorkerService;
 import net.sf.json.JSONObject;
 
+import org.apache.log4j.Logger;
+
+import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
+
 public class WorkerSinkService extends WorkerService<WorkerSink> {
 
   private Logger _log = Logger.getLogger(WorkerSinkService.class);

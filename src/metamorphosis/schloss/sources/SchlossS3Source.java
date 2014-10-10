@@ -14,7 +14,7 @@ import org.javatuples.Pair;
 
 import com.google.common.collect.Lists;
 
-public class SchlossS3Source implements SchlossSource{
+public class SchlossS3Source extends SchlossSource{
 
   private JSONObject _message;
   private Logger _log = Logger.getLogger(SchlossS3Source.class);

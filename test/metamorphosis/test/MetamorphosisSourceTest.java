@@ -69,11 +69,7 @@ public class MetamorphosisSourceTest {
     _schlossService = new SchlossService();
     _workerSourceService = new  WorkerSourceService(_workerSourceQueues.get(0), _localKakfaService);
     _workerSinkService = new  WorkerSinkService(_workerSinkQueues.get(0), _localKakfaService);
-    
-    _schlossService.start();
-    _workerSinkService.start();
-    _workerSourceService.start();
-    
+
   }
   
   @After
@@ -87,7 +83,8 @@ public class MetamorphosisSourceTest {
   
   @Test
   public void testSourceMessage() throws InterruptedException{
-    
+    _workerSourceService.start();
+    _schlossService.startSourceReadThread();
     JSONBuilder builder = new JSONStringer();
     builder.object()
     .key("topic").value(destinationTopic)
@@ -106,17 +103,26 @@ public class MetamorphosisSourceTest {
 
     String message = builder.toString();
     _localKakfaService.sendMessage(SCHLOSS_SOURCE_QUEUE, message);
-    _log.info("Sleeping 30 seconds");
-    Thread.sleep(90000);
+    _log.info("Sleeping 10 seconds");
+    Thread.sleep(10000);
+    _schlossService.stop();
+    _workerSourceService.stop();
     
-    List<String> receivedMessages = new ArrayList<String>(); 
-    List<String> messages = _localKakfaService.readStringMessagesInTopic(destinationTopic);
-    receivedMessages.addAll(messages);
-
-    _log.info("Total messages on producer queues: " + receivedMessages.size());   
-    assertEquals(10000, receivedMessages.size());
+    _log.info("");
+    _log.info("");
+    _log.info("Reading messages for confirmation for source phase");
+    _log.info("");
+    _log.info("");
     
-
+    int numMessages = _localKakfaService.readNumMessages(destinationTopic);
+    _log.info("");
+    _log.info("Total messages on producer queues: " + numMessages);   
+    _log.info("");
+    assertEquals(10000, numMessages);
+    
+    _schlossService.start();
+    _workerSinkService.start();
+    
     JSONBuilder builderSink = new JSONStringer();
     builderSink.object()
     .key("topic").value(destinationTopic)
@@ -134,12 +140,13 @@ public class MetamorphosisSourceTest {
         .endObject()
       .endObject()
     .endObject();
-
     String sinkMessage = builderSink.toString();
     _localKakfaService.sendMessage(SCHLOSS_SINK_QUEUE, sinkMessage);
+    _log.info("Sleeping 10 seconds ...");
     Thread.sleep(30000);
     
-    
+    _schlossService.stop();
+    _workerSinkService.stop();
   }
   
 }

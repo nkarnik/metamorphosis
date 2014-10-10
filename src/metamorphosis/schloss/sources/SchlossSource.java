@@ -1,9 +1,7 @@
 package metamorphosis.schloss.sources;
 
-import java.util.List;
+import metamorphosis.schloss.SchlossDistributor;
 
-public interface SchlossSource {
-
-  List<String> getWorkerMessages();
+public abstract class SchlossSource implements SchlossDistributor {
 
 }

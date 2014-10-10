@@ -22,7 +22,10 @@ import kafka.producer.ProducerConfig;
 import kafka.serializer.StringDecoder;
 import kafka.utils.TestUtils;
 import kafka.utils.VerifiableProperties;
+import metamorphosis.schloss.sinks.SchlossSink;
+import metamorphosis.schloss.sinks.SchlossSinkFactory;
 import metamorphosis.schloss.sources.SchlossSource;
+import metamorphosis.schloss.sources.SchlossSourceFactory;
 import metamorphosis.utils.Config;
 import metamorphosis.utils.JSONDecoder;
 import metamorphosis.utils.KafkaUtils;
@@ -60,8 +63,20 @@ public class SchlossService {
 
   public void start() {
     // Start while loop
-    _sourceReadThread = Utils.run(new SchlossSourceReadThread(_sourceTopic));
+    startSourceReadThread();
+    startSinkReadThread();
+  }
+
+
+
+  public void startSinkReadThread() {
     _sinkReadThread = Utils.run(new SchlossSinkReadThread(_sinkTopic));
+  }
+
+
+
+  public void startSourceReadThread() {
+    _sourceReadThread = Utils.run(new SchlossSourceReadThread(_sourceTopic));
   }
 
   
@@ -85,10 +100,14 @@ public class SchlossService {
     isRunning.set(false);
     
     try {
-      _log.info("Waiting on source read thread");
-      _sourceReadThread.get();
-      _log.info("Waiting on sink read thread");
-      _sinkReadThread.get();
+      if(_sourceReadThread != null && !_sourceReadThread.isDone()){
+        _log.info("Waiting on source read thread");
+        _sourceReadThread.get();
+      }
+      if(_sinkReadThread != null && !_sinkReadThread.isDone()){
+        _log.info("Waiting on sink read thread");
+        _sinkReadThread.get();
+      }
     } catch (InterruptedException | ExecutionException e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
@@ -98,16 +117,18 @@ public class SchlossService {
   }
 
   
- private abstract class SchlossReadThread implements Callable<String> {
+ private abstract class SchlossReadThread<T extends SchlossDistributor> implements Callable<String> {
     
     private String[] _workerQueues;
     private String _messageQueue;
+    private SchlossFactory<T> _factory;
 
-    public SchlossReadThread(String messageTopic, String targetWorkerQueues){
+    public SchlossReadThread(String messageTopic, String targetWorkerQueues, SchlossFactory<T> factory){
       String workerQueuesString = Config.singleton().getOrException(targetWorkerQueues);
       _workerQueues = workerQueuesString.split(",");
       _messageQueue = messageTopic;
-      _log.info("Created read thread for queue: " + _messageQueue);
+      _factory = factory;
+      _log.info("Created read thread for queue: " + _messageQueue + " with factory of type: " + _factory);
     } 
     
     public abstract void distributeMessagesToQueues(String[] _workerQueues, List<String> workerQueueMessages);
@@ -125,7 +146,7 @@ public class SchlossService {
             MessageAndMetadata<String, JSONObject> next = iterator.next();
             JSONObject message = next.message();
             _log.info("Processing message: " + message.toString());
-            SchlossSource schlossSource = SchlossSourceFactory.createSource(message);
+            SchlossDistributor schlossSource = _factory.createSchlossDistributor(message);
             List<String> workerQueueMessages = schlossSource.getWorkerMessages();
             distributeMessagesToQueues(_workerQueues, workerQueueMessages);
             
@@ -139,11 +160,11 @@ public class SchlossService {
     }
   }
  
- public class SchlossSourceReadThread extends SchlossReadThread{
+ public class SchlossSourceReadThread extends SchlossReadThread<SchlossSource>{
 
   private int _queueToPush = 0;
   public SchlossSourceReadThread(String messageTopic) {
-    super(messageTopic, "worker.source.queues");
+    super(messageTopic, "worker.source.queues", new SchlossSourceFactory());
   }
   
   public void distributeMessagesToQueues(String[] _workerQueues, List<String> workerQueueMessages) {
@@ -165,20 +186,28 @@ public class SchlossService {
   }
  }
  
- public class SchlossSinkReadThread extends SchlossReadThread{
+ public class SchlossSinkReadThread extends SchlossReadThread<SchlossSink>{
 
   public SchlossSinkReadThread(String messageTopic) {
-    super(messageTopic, "worker.sink.queues");
+    super(messageTopic, "worker.sink.queues", new SchlossSinkFactory());
 
   }
 
   @Override
   public void distributeMessagesToQueues(String[] workerQueues, List<String> workerQueueMessages) {
     // Write to all topics.
+    _log.info("Schloss Sink distributing " + workerQueueMessages.size() + " messages to " + workerQueues.length + " queues" );
+    List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
     for(String workerSinkQ: workerQueues){
-      
+      for(String queueMessage : workerQueueMessages){
+        messages.add(new KeyedMessage<Integer,String>(workerSinkQ,queueMessage));  
+      }
     }
-    
+    //Create the producer for this distribution
+    Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_brokers), "kafka.producer.DefaultPartitioner");
+    Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
+    producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
+    producer.close(); 
   }
    
  }

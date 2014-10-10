@@ -70,8 +70,7 @@ java -jar #{jvm_debug} -Xmx8g \
  --worker.sink.queues #{worker_sink_queues}\
  --worker.source.queue #{worker_source_queue}\
  --worker.sink.queue #{worker_sink_queue}\
- --service #{service}\
-\"
+ --service #{service}
 CMD
 puts command
 system command

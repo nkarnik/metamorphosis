@@ -37,21 +37,26 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
     // Distribute strategy
     _log.info("sending messages to " + Joiner.on(',').join(_kafkaService.getSeedBrokers()));
     int msgsSent = 0;
-    for( String workerQueueMessage : messageIterator) {
-      String topicQueue = workerSource.getTopic();
-      //_log.info("Sending message " + workerQueueMessage + " to queue: " + topic);
-      List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
-      messages.add(new KeyedMessage<Integer,String>(topicQueue,workerQueueMessage));
-      producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
-      msgsSent++;
+    try{
+      for( String workerQueueMessage : messageIterator) {
+        String topicQueue = workerSource.getTopic();
+        //_log.info("Sending message " + workerQueueMessage + " to queue: " + topic);
+        List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
+        messages.add(new KeyedMessage<Integer,String>(topicQueue,workerQueueMessage));
+        producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
+        msgsSent++;
+      }
+      
+    }finally{
+      File cachedFile = messageIteratorPair.getValue0();
+      _log.info("Messages sent: " + msgsSent);
+      if(cachedFile != null && cachedFile.exists()){
+        _log.info("Deleting cached file: " + cachedFile.getAbsolutePath());
+        cachedFile.delete();
+      }
+      //Create the producer for this distribution
+      producer.close();
+      
     }
-    File cachedFile = messageIteratorPair.getValue0();
-    _log.info("Messages sent: " + msgsSent);
-    if(cachedFile != null && cachedFile.exists()){
-      _log.info("Deleting cached file: " + cachedFile.getAbsolutePath());
-      cachedFile.delete();
-    }
-    //Create the producer for this distribution
-    producer.close();
   }
 }

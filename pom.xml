@@ -5,6 +5,11 @@
 	<artifactId>metamorphosis</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>metamorphosis</name>
+	<properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <fork>3C</fork>
+    <!-- <fork>3C</fork> -->
+  </properties>
 	<profiles>
 		<profile>
 			<id>run</id>

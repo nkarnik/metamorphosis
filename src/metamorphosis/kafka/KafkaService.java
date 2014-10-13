@@ -109,4 +109,18 @@ public class KafkaService implements Serializable{
     _log.info("Topic created: " + topic + " with " + partitions + " partitions and replication: " + replicationFactor);
 
   }
+
+  /**
+   * Creates a topic with 1 partition and 1 replication factor
+   * @param queues
+   */
+  public void ensureQueuesExist(String... queues) {
+    for(String queue : queues){
+      if(!hasTopic(queue)){
+        createTopic(queue, 1, 1);
+      }else{
+        _log.info("Topic " + queue + " already exists, nothing to do.");
+      }
+    }
+  }
 }

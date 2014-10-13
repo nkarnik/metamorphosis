@@ -5,14 +5,10 @@
 	<artifactId>metamorphosis</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>metamorphosis</name>
-	<profiles>
-		<profile>
-			<id>test</id>
-			<build>
-				<directory>target_test</directory>
-			</build>
-		</profile>
-	</profiles>
+	<properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <fork>3C</fork>
+  </properties>
 	<repositories>
 		<repository>
 			<id>eclipse</id>
@@ -131,11 +127,37 @@
 			<scope>compile</scope>
 			<classifier>test</classifier>
 		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>1.7.2</version>
+		</dependency>
 	</dependencies>
 	<build>
-		<sourceDirectory>src</sourceDirectory>
+		<resources>
+			<resource>
+				<directory>src/</directory>
+			</resource>
+		</resources>
+		<sourceDirectory>src/</sourceDirectory>
 		<testSourceDirectory>src/</testSourceDirectory>
 		<plugins>
+			<plugin>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<configuration>
+					<archive>
+						<manifest>
+							<mainClass>metamorphosis.MetamorphosisService</mainClass>
+						</manifest>
+						<manifestEntries>
+							<Class-Path>.</Class-Path>
+						</manifestEntries>
+					</archive>
+					<descriptorRefs>
+						<descriptorRef>jar-with-dependencies</descriptorRef>
+					</descriptorRefs>
+				</configuration>
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
@@ -168,10 +190,6 @@
 				<configuration>
 					<mainClass>metamorphosis.MetamorphosisService</mainClass>
 					<arguments>
-						<argument>-classpath</argument>
-						<!-- automatically creates the classpath using all project dependencies, 
-							also adding the project build directory -->
-						<classpath />
 					</arguments>
 				</configuration>
 			</plugin>

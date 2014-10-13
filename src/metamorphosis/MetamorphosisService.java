@@ -22,9 +22,18 @@ public class MetamorphosisService {
 
   private static Logger _log = Logger.getLogger(MetamorphosisService.class);
 
+  static String workerSourceQueue = "worker.source.queue";
+  static String workerSinkQueue = "worker.sink.queue";
+  static String schlossSinkQueue = "schloss.sink.queue";
+  static String schlossSourceQueue = "schloss.source.queue";
+  static String workerSinkQueues = "worker.sink.queues";
+  static String workerSourceQueues = "worker.source.queues";
+
   @SuppressWarnings("static-access")
   public static void main(String[] args) throws ParseException {
- // Command line options
+    
+    System.out.println("Starting metamorphosis");
+    _log.info("Starting metamorphosis logs...");
     CommandLineParser parser = new GnuParser();
     Options availOptions = new Options();
     new Config();
@@ -58,28 +67,28 @@ public class MetamorphosisService {
     
     availOptions.addOption(OptionBuilder
         .hasArg()
-        .withLongOpt("schloss.sink.queue")
+        .withLongOpt(schlossSinkQueue)
         .withType(String.class)
         .create()
         );
 
     availOptions.addOption(OptionBuilder
         .hasArg()
-        .withLongOpt("schloss.source.queue")
+        .withLongOpt(schlossSourceQueue)
         .withType(String.class)
         .create()
         );
 
     availOptions.addOption(OptionBuilder
         .hasArg()
-        .withLongOpt("worker.sink.queues")
+        .withLongOpt(workerSinkQueues)
         .withType(String.class)
         .create()
         );
 
     availOptions.addOption(OptionBuilder
         .hasArg()
-        .withLongOpt("worker.source.queues")
+        .withLongOpt(workerSourceQueues)
         .withType(String.class)
         .create()
         );
@@ -87,14 +96,14 @@ public class MetamorphosisService {
     
     availOptions.addOption(OptionBuilder
         .hasArg()
-        .withLongOpt("worker.sink.queue")
+        .withLongOpt(workerSinkQueue)
         .withType(String.class)
         .create()
         );
 
     availOptions.addOption(OptionBuilder
         .hasArg()
-        .withLongOpt("worker.source.queue")
+        .withLongOpt(workerSourceQueue)
         .withType(String.class)
         .create()
         );
@@ -115,7 +124,7 @@ public class MetamorphosisService {
       exitWithHelp(availOptions);
       return;
     }
-
+    
     Config.singleton().put("kafka.brokers", options.getOptionValue("kafka.brokers", "192.168.111.107:9092,192.168.111.108:9092"));
     String zkHost = options.getOptionValue("kafka.zookeeper.host", "192.168.111.106");
     String zkPort = options.getOptionValue("kafka.zookeeper.port", "2181");
@@ -128,30 +137,45 @@ public class MetamorphosisService {
     Config.singleton().put("kafka.service", kafkaService);
     
     System.out.println(Config.singleton().toString());
-    
+    _log.info("Starting service: " + service);
     switch(service){
     case "schloss":
-      if( !options.hasOption("schloss.source.queue") || 
-          !options.hasOption("schloss.sink.queue") || 
-          !options.hasOption("worker.sink.queues") || 
-          !options.hasOption("worker.source.queues")){
+      if( !options.hasOption(schlossSourceQueue) || 
+          !options.hasOption(schlossSinkQueue) || 
+          !options.hasOption(workerSinkQueues) || 
+          !options.hasOption(workerSourceQueues)){
         _log.error("Requested schloss service without the schloss source and sink topics");
         exitWithHelp(availOptions);
       }
-      Config.singleton().put("schloss.source.queue", options.getOptionValue("schloss.source.queue"));
-      Config.singleton().put("schloss.sink.queue", options.getOptionValue("schloss.sink.queue"));
-      Config.singleton().put("worker.source.queues", options.getOptionValue("worker.source.queues"));
-      Config.singleton().put("worker.sink.queues", options.getOptionValue("worker.sink.queues"));
+      String schlossSourceQueueValue = options.getOptionValue(schlossSourceQueue);
+      String schlossSinkQueueValue = options.getOptionValue(schlossSinkQueue);
+      String workerSourceQueuesValue = options.getOptionValue(workerSourceQueues);
+      String workerSinkQueuesValue = options.getOptionValue(workerSinkQueues);
+
+      Config.singleton().put(schlossSourceQueue, schlossSourceQueueValue);
+      Config.singleton().put(schlossSinkQueue, schlossSinkQueueValue);
+      Config.singleton().put(workerSourceQueues, workerSourceQueuesValue);
+      Config.singleton().put(workerSinkQueues, workerSinkQueuesValue);
+      
+      kafkaService.ensureQueuesExist(schlossSourceQueueValue,schlossSinkQueueValue);
+      kafkaService.ensureQueuesExist(workerSourceQueuesValue.split(","));
+      kafkaService.ensureQueuesExist(workerSinkQueuesValue.split(","));
+      
       startSchlossService();
       break;
       
     case "worker":
-      if(!options.hasOption("worker.source.queue") || !options.hasOption("worker.sink.queue")){
+      if(!options.hasOption(workerSourceQueue) || !options.hasOption(workerSinkQueue)){
         _log.error("Requested worker service without the worker source and sink queue name");
         exitWithHelp(availOptions);
       }
-      Config.singleton().put("worker.source.queue", options.getOptionValue("worker.source.queue"));
-      Config.singleton().put("worker.sink.queue", options.getOptionValue("worker.sink.queue"));
+      String workerSourceQueueValue = options.getOptionValue(workerSourceQueue);
+      String workerSinkQueueValue = options.getOptionValue(workerSinkQueue);
+      
+      Config.singleton().put(workerSourceQueue, workerSourceQueueValue);
+      Config.singleton().put(workerSinkQueue, workerSinkQueueValue);
+      
+      kafkaService.ensureQueuesExist(workerSourceQueueValue, workerSinkQueueValue);
 
       startWorkerService(kafkaService);
       break;
@@ -168,8 +192,8 @@ public class MetamorphosisService {
 
   private static void startWorkerService(KafkaService kafkaService) {
     _log.info("Starting worker services");
-    WorkerSourceService sourceService = new WorkerSourceService((String)Config.singleton().getOrException("worker.source.queue"), kafkaService);
-    WorkerSinkService sinkService = new WorkerSinkService((String)Config.singleton().getOrException("worker.sink.queue"), kafkaService);
+    WorkerSourceService sourceService = new WorkerSourceService((String)Config.singleton().getOrException(workerSourceQueue), kafkaService);
+    WorkerSinkService sinkService = new WorkerSinkService((String)Config.singleton().getOrException(workerSinkQueue), kafkaService);
     sourceService.start();
     sinkService.start();
     while(true){

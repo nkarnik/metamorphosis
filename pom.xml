@@ -203,10 +203,6 @@
 				<configuration>
 					<mainClass>metamorphosis.MetamorphosisService</mainClass>
 					<arguments>
-						<argument>-classpath</argument>
-						<!-- automatically creates the classpath using all project dependencies, 
-							also adding the project build directory -->
-						<classpath />
 					</arguments>
 				</configuration>
 			</plugin>

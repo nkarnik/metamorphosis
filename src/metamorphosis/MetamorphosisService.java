@@ -32,7 +32,8 @@ public class MetamorphosisService {
   @SuppressWarnings("static-access")
   public static void main(String[] args) throws ParseException {
     
-
+    System.out.println("Starting metamorphosis");
+    _log.info("Starting metamorphosis logs...");
     CommandLineParser parser = new GnuParser();
     Options availOptions = new Options();
     new Config();

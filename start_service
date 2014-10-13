@@ -60,8 +60,8 @@ jvm_debug=""
 #jvm_debug="-Xdebug -Xrunjdwp:transport=dt_socket,address=8001,server=y,suspend=y"
 
 command = <<-CMD       
-mvn clean compile assembly:single; cd target;\
-mvn exec:exec -Dexec.classpathScope=\"compile\" -Dexec.executable=\"java\" \
+mvn -Prun clean compile; \
+mvn -Prun exec:exec -Dexec.classpathScope=\"compile\" -Dexec.executable=\"java\" \
 -Dexec.args=\"#{jvm_debug} -Xmx8g -classpath %classpath \
 metamorphosis.MetamorphosisService\
  --kafka.brokers #{kafka_brokers_hosts_string}\

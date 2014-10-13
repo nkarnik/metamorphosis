@@ -7,9 +7,9 @@
 	<name>metamorphosis</name>
 	<profiles>
 		<profile>
-			<id>test</id>
+			<id>run</id>
 			<build>
-				<directory>target_test</directory>
+				<directory>target_run</directory>
 			</build>
 		</profile>
 	</profiles>

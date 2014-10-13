@@ -199,6 +199,12 @@ public class KafkaUtils {
 
   
   public static ConsumerConfig createConsumerConfig(String zookeeper, String groupId) {
+    Properties props = getDefaultProperties(zookeeper, groupId);
+    
+    return new ConsumerConfig(props);
+  }
+
+  public static Properties getDefaultProperties(String zookeeper, String groupId) {
     Properties props = new Properties();
     props.put("zookeeper.connect", zookeeper);
     props.put("group.id", groupId);
@@ -207,8 +213,7 @@ public class KafkaUtils {
     props.put("auto.commit.interval.ms", "1000");
     props.put("auto.offset.reset", "smallest");
     props.put("consumer.timeout.ms", "2000");
-    
-    return new ConsumerConfig(props);
+    return props;
   }
   
 

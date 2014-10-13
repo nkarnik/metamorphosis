@@ -8,16 +8,7 @@
 	<properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <fork>3C</fork>
-    <!-- <fork>3C</fork> -->
   </properties>
-	<!-- <profiles>
-		<profile>
-			<id>run</id>
-			<build>
-				<directory>target_run</directory>
-			</build>
-		</profile>
-	</profiles> -->
 	<repositories>
 		<repository>
 			<id>eclipse</id>
@@ -146,10 +137,6 @@
 		<resources>
 			<resource>
 				<directory>src/</directory>
-				<!-- <targetPath>${basedir}/target_run</targetPath>
-				<includes>
-					<include>log4j.properties</include>
-				</includes> -->
 			</resource>
 		</resources>
 		<sourceDirectory>src/</sourceDirectory>

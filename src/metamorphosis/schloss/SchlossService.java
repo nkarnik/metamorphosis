@@ -85,7 +85,12 @@ public class SchlossService {
   
   private ConsumerIterator<String, JSONObject> getIterator(String messageTopic) {
     String clientName = "schloss_service_consumer_" + messageTopic;
+    Properties defaultProperties = KafkaUtils.getDefaultProperties(_zkConnectString, clientName);
+    String consumerTimeout = Config.singleton().get("kafka.consumer.timeout.ms", "1000");
+    defaultProperties.put("consumer.timeout.ms", consumerTimeout);
+    
     ConsumerConfig consumerConfig = KafkaUtils.createConsumerConfig(_zkConnectString, clientName);
+    
     ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(consumerConfig);
 
     Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
@@ -154,7 +159,7 @@ public class SchlossService {
             
           }
         }catch(ConsumerTimeoutException e){
-          _log.info("No messages yet on " + _sourceTopic + ". Blocking on iterator.hasNext...");
+          _log.info("No messages yet on " + _messageQueue + ". Blocking on iterator.hasNext...");
         }
       }
       _log.info("Done with the schloss service loop");

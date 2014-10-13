@@ -54,7 +54,7 @@ worker_source_queues = "producer_queue_0,producer_queue_1"
 worker_sink_queues = "consumer_queue_0,consumer_queue_1"
 worker_source_queue = "producer_queue_0"
 worker_sink_queue = "consumer_queue_0"
-
+kafka_consumer_timeout = "60000"
 #To allow debugging from eclipse while running on vagrant/test/prod. add at the start of -Dexec.args="
 jvm_debug=""
 #jvm_debug="-Xdebug -Xrunjdwp:transport=dt_socket,address=8001,server=y,suspend=y"
@@ -66,6 +66,7 @@ mvn exec:exec -Dexec.classpathScope=\"compile\" -Dexec.executable=\"java\" \
 metamorphosis.MetamorphosisService\
  --kafka.brokers #{kafka_brokers_hosts_string}\
  --kafka.zookeeper.host #{kafka_zookeeper}\
+ --kafka.consumer.timeout.ms #{kafka_consumer_timeout}\
  --schloss.source.queue #{metamorphosis_source_topic}\
  --schloss.sink.queue #{metamorphosis_sink_topic}\
  --worker.source.queues #{worker_source_queues}\

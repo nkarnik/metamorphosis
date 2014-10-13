@@ -39,9 +39,25 @@ end
 opt_parser.parse!
 env = ARGV.shift
 service = ARGV.shift
-
+hostname = `hostname`.chomp + ".ec2.internal"
+puts "hostname is #{hostname}"
 
 kafka_brokers = find_nodes(env, "kafka_broker")
+puts kafka_brokers
+
+brokerlist = kafka_brokers.sort
+
+brokernum = 0
+brokerlist.each do |broker|
+  if broker == hostname
+    puts "Found host, queue num is #{brokernum}"
+    break
+  else
+    brokernum += 1
+  end
+end
+
+puts "Queue num is #{brokernum}"
 kafka_brokers_hosts_string = kafka_brokers.map{|b| b + ":#{DEFAULT_KAFKA_PORT}"}.join(',')
 
 kafka_zookeeper = find_nodes(env, "kafka_zookeeper").first()
@@ -49,11 +65,22 @@ kafka_zookeeper = find_nodes(env, "kafka_zookeeper").first()
 metamorphosis_source_topic = "source_queue"
 metamorphosis_sink_topic = "sink_queue"
 
+numbrokers = 0
+worker_source_queues = ""
+worker_sink_queueS = ""
 
-worker_source_queues = "producer_queue_0,producer_queue_1"
-worker_sink_queues = "consumer_queue_0,consumer_queue_1"
-worker_source_queue = "producer_queue_0"
-worker_sink_queue = "consumer_queue_0"
+brokerlist.each do |broker|
+  worker_source_queues += "producer_queue_#{numbrokers},"
+  worker_source_queues += "consumer_queue_#{numbrokers},"
+  numbrokers += 1
+end
+
+
+
+worker_source_queues = worker_source_queues[0..-2]
+worker_sink_queues = worker_source_queues[0..-2]
+worker_source_queue = "producer_queue_" + brokernum.to_s
+worker_sink_queue = "consumer_queue_" + brokernum.to_s
 kafka_consumer_timeout = "60000"
 #To allow debugging from eclipse while running on vagrant/test/prod. add at the start of -Dexec.args="
 jvm_debug=""

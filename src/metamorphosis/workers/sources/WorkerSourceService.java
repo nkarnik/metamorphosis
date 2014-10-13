@@ -1,5 +1,6 @@
 package metamorphosis.workers.sources;
 
+import java.io.File;
 import java.util.List;
 import java.util.Properties;
 
@@ -12,6 +13,7 @@ import metamorphosis.workers.WorkerService;
 import net.sf.json.JSONObject;
 
 import org.apache.log4j.Logger;
+import org.javatuples.Pair;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
@@ -27,35 +29,29 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
   @Override
   protected void processMessage(final JSONObject poppedMessage) {
     WorkerSource workerSource = _workerFactory.createWorker(poppedMessage);
-    Iterable<String> messageIterator = workerSource.getMessageIterator();
-    produceDataToTopic(messageIterator, workerSource.getTopic());
-  }
-
-  /**
-   * 
-   * @param workerQueueMessages
-   * @param topic
-   */
-  
-  protected void produceDataToTopic(Iterable<String> workerQueueMessages, String topic) {
+    Pair<File,Iterable<String>> messageIteratorPair = workerSource.getMessageIterator();
+    Iterable<String> messageIterator = messageIteratorPair.getValue1();
     Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_kafkaService.getSeedBrokers()), "kafka.producer.DefaultPartitioner");
     Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
-    
-    
-    
+
     // Distribute strategy
     _log.info("sending messages to " + Joiner.on(',').join(_kafkaService.getSeedBrokers()));
     int msgsSent = 0;
-    for( String workerQueueMessage : workerQueueMessages) {
-      String topicQueue = topic;
+    for( String workerQueueMessage : messageIterator) {
+      String topicQueue = workerSource.getTopic();
       //_log.info("Sending message " + workerQueueMessage + " to queue: " + topic);
       List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
       messages.add(new KeyedMessage<Integer,String>(topicQueue,workerQueueMessage));
       producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
       msgsSent++;
     }
-    _log.info("messages sent: " + msgsSent);
+    File cachedFile = messageIteratorPair.getValue0();
+    _log.info("Messages sent: " + msgsSent);
+    if(cachedFile != null && cachedFile.exists()){
+      _log.info("Deleting cached file: " + cachedFile.getAbsolutePath());
+      cachedFile.delete();
+    }
     //Create the producer for this distribution
-    producer.close(); 
+    producer.close();
   }
 }

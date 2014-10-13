@@ -108,6 +108,13 @@ public class MetamorphosisService {
         .create()
         );
     
+    availOptions.addOption(OptionBuilder
+        .hasArg()
+        .withLongOpt("kafka.consumer.timeout.ms")
+        .withType(String.class)
+        .create()
+        );
+    
     // Parse the options...
     final org.apache.commons.cli.CommandLine rawOptions = parser.parse(availOptions, args);
     assert (rawOptions != null);
@@ -131,6 +138,7 @@ public class MetamorphosisService {
     Config.singleton().put("kafka.zookeeper.host", zkHost);
     Config.singleton().put("kafka.zookeeper.port", zkPort);
     Config.singleton().put("kafka.zookeeper.connect",zkHost + ":" + zkPort + "/kafka");
+    Config.singleton().put("kafka.consumer.timeout.ms", "1000");
     String service = options.getOptionValue("service");
 
     KafkaService kafkaService = new KafkaService();

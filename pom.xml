@@ -10,14 +10,14 @@
     <fork>3C</fork>
     <!-- <fork>3C</fork> -->
   </properties>
-	<profiles>
+	<!-- <profiles>
 		<profile>
 			<id>run</id>
 			<build>
 				<directory>target_run</directory>
 			</build>
 		</profile>
-	</profiles>
+	</profiles> -->
 	<repositories>
 		<repository>
 			<id>eclipse</id>
@@ -146,10 +146,10 @@
 		<resources>
 			<resource>
 				<directory>src/</directory>
-				<targetPath>${basedir}/target</targetPath>
+				<!-- <targetPath>${basedir}/target_run</targetPath>
 				<includes>
 					<include>log4j.properties</include>
-				</includes>
+				</includes> -->
 			</resource>
 		</resources>
 		<sourceDirectory>src/</sourceDirectory>

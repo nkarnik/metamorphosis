@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.util.zip.GZIPOutputStream;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Logger;
 
 import kafka.consumer.ConsumerIterator;
@@ -105,14 +106,17 @@ public class WorkerS3Sink extends WorkerSink {
       _log.info(ioe.getStackTrace());
       return;
     }
-    
     finally {
-      if (_writer != null)
+      if (_writer != null){
         try {
           _writer.close();
         } catch (IOException e) {
           _log.info(e.getStackTrace());
         }
+      }
+      if(_file != null && _file.exists()){
+        _file.delete();
+      }
     }
   }
   
@@ -130,6 +134,9 @@ public class WorkerS3Sink extends WorkerSink {
       } catch (S3Exception | IOException e) {
         _log.error("Flush failed: ", e);
         return false;
+      } finally {
+        _log.info("Deleting file: " + _file.getAbsolutePath());
+        _file.delete();
       }
     }
     return false;

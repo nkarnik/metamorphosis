@@ -1,6 +1,7 @@
 package metamorphosis.workers.sources;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 
 import metamorphosis.utils.BufferedReaderIterable;
@@ -9,6 +10,7 @@ import metamorphosis.utils.s3.S3Util;
 import net.sf.json.JSONObject;
 
 import org.apache.log4j.Logger;
+import org.javatuples.Pair;
 
 
 public class WorkerS3Source extends WorkerSource {
@@ -22,6 +24,7 @@ public class WorkerS3Source extends WorkerSource {
   private BufferedReader _bufferedShardReader;
 //  private List<String> _shardContents;
   private BufferedReaderIterable _brIterable;
+  private File _cachedFile;
 
   public WorkerS3Source(JSONObject message) {
     _message = message;
@@ -35,16 +38,19 @@ public class WorkerS3Source extends WorkerSource {
   }
 
   @Override
-  public Iterable<String> getMessageIterator() {
+  public Pair<File, Iterable<String>> getMessageIterator() {
     
     try {
-      _bufferedShardReader = S3Util.getCachedGzipFileReader(_bucketName, _shardPath);
+      Pair<File, BufferedReader> cachedGzipFileReaderPair = S3Util.getCachedGzipFileReader(_bucketName, _shardPath);
+      _bufferedShardReader = cachedGzipFileReaderPair.getValue1();
+      _cachedFile = cachedGzipFileReaderPair.getValue0();
       _brIterable = new BufferedReaderIterable(_bufferedShardReader);
       
+      return new Pair<File, Iterable<String>>(cachedGzipFileReaderPair.getValue0(),_brIterable);
     } catch (IOException | InterruptedException | S3Exception e) {
       _log.info("Failed to get s3 shard path: " + _shardPath);
-    }  
-    return _brIterable;
+    }
+    return null;
   }
   
   public void shutdown(){

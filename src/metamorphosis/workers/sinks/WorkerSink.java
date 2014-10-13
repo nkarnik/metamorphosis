@@ -1,6 +1,9 @@
 package metamorphosis.workers.sinks;
 
+import java.io.File;
 import java.io.IOException;
+
+import org.javatuples.Pair;
 
 import kafka.consumer.ConsumerIterator;
 import net.sf.json.JSONObject;
@@ -9,7 +12,7 @@ import metamorphosis.workers.Worker;
 public abstract class WorkerSink implements Worker {
 
   @Override
-  public Iterable<String> getMessageIterator() {
+  public Pair<File, Iterable<String>> getMessageIterator() {
     // TODO Auto-generated method stub
     return null;
   }

@@ -96,6 +96,6 @@ metamorphosis.MetamorphosisService\
 CMD
 puts command
 
-# system command
+system command
 
 

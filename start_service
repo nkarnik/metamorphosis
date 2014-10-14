@@ -65,7 +65,7 @@ when "worker"
     puts "ERROR: Cannot assign broker num. #{hostname} is not found in the list of brokers: #{kafka_brokers.join(",")}"
     exit
   end
-  puts "Queue num is #{brokernum}"
+  puts "Queue num is #{broker_num}"
   
   worker_source_queue = "worker_source_queue_#{broker_num}"
   worker_sink_queue = "worker_sink_queue_#{broker_num}"

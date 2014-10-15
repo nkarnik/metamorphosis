@@ -46,11 +46,13 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
 
     // Distribute strategy
     int msgsSent = 0;
+    int bytesReceived = 0;
     try{
       for( String workerQueueMessage : messageIterator) {
         String topicQueue = workerSource.getTopic();
         //_log.info("Sending message " + workerQueueMessage + " to queue: " + topic);
         List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
+        bytesReceived += workerQueueMessage.getBytes().length;
         messages.add(new KeyedMessage<Integer,String>(topicQueue,workerQueueMessage));
         producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
         msgsSent++;
@@ -59,6 +61,7 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
     }finally{
       File cachedFile = messageIteratorPair.getValue0();
       _log.info("Messages sent: " + msgsSent + " from file:\t" + cachedFile.getAbsolutePath());
+      _log.info("Bytes sent : " + bytesReceived + " from file:\t" + cachedFile.getAbsolutePath());
       if(cachedFile != null && cachedFile.exists()){
         _log.debug("Deleting cached file: " + cachedFile.getAbsolutePath());
         cachedFile.delete();

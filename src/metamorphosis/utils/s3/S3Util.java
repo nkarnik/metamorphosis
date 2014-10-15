@@ -319,7 +319,7 @@ public class S3Util {
       // Let's try to get a lock...
       try (final MultiLock lock = FileLockUtil.lock(lockPath)) {
  
-        _log.info("Caching content: " + key);
+        _log.debug("Caching content: " + key);
         final RestS3Service s3Service = new RestS3Service(AWS_CREDENTIALS);
         final S3Object s3obj = s3Service.getObject(bucket, key);
         final DownloadPackage dl = new DownloadPackage(s3obj, file);
@@ -333,7 +333,7 @@ public class S3Util {
         Files.touch(readyFile);
  
         // Release
-        _log.info("Caching content done. File: " + readyPath);
+        _log.debug("Caching content done. File: " + readyPath);
       } catch (IOException e) {
         throw new S3Exception(Utils.handleInterruptible(e));
       } catch(ServiceException e) {

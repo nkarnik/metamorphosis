@@ -17,31 +17,25 @@ import net.sf.json.JSONObject;
 
 import org.apache.log4j.Logger;
 
+import com.google.common.base.Joiner;
+
 public class WorkerS3Sink extends WorkerSink {
   
   private static Logger _log = Logger.getLogger(KafkaUtils.class);
 
   private JSONObject _message;
   private String _topicToRead;
-  private String _sinkType;
   private String _bucketName;
   private String _shardPath;
   private int _bytesFetched;
-
-  private String _gzFileToWrite;
-
   private File _file;
 
-  private String _shardPrefix;
-
   private String _shardFull;
-
   private BufferedWriter _writer;
-
   private GZIPOutputStream _zip;
-
   private JSONObject _sinkObject;
-  
+
+  private String _shardPrefix;
   private static long MIN_SHARD_SIZE = 50 * 1000 * 1000;
 
   public WorkerS3Sink(JSONObject message) {
@@ -52,14 +46,8 @@ public class WorkerS3Sink extends WorkerSink {
     _bucketName = config.getString("bucket");
     _shardPath = config.getString("shard_path");
     _shardPrefix = config.getString("shard_prefix");
-    _shardFull = _shardPath + _shardPrefix + "2";
     _topicToRead = message.getString("topic");
-    _sinkType = _sinkObject.getString("type");
     _bytesFetched = 0;
-
-    //_shardFull = _topicToRead + queueNumber + sinkObject.getInt("retry")
-    _gzFileToWrite = "/tmp/" + _topicToRead + ".gz";
-    _log.info("Shard name is: " + _gzFileToWrite);
   }
 
 
@@ -70,13 +58,15 @@ public class WorkerS3Sink extends WorkerSink {
   }
 
   @Override
-  public void sink(ConsumerIterator<String, String> iterator, String queueNumber) {
+  public void sink(ConsumerIterator<String, String> iterator, int queueNumber) {
     
-    _shardFull = _shardPath + _topicToRead + queueNumber + _sinkObject.getInt("retry");
-    
+    int shardNum = queueNumber * 1000 + _sinkObject.getInt("retry");
+    _shardFull = _shardPath + _shardPrefix + shardNum + ".gz";
+    String gzFileToWrite = "/tmp/" + _shardPrefix + shardNum + ".gz";
+
     try {
-      _file = new File(_gzFileToWrite);
-      _log.info("Created File locally...");
+      _file = new File(gzFileToWrite);
+      _log.debug("Created File locally: " + gzFileToWrite);
     
       _zip = new GZIPOutputStream(new FileOutputStream(_file));
       _writer = new BufferedWriter(new OutputStreamWriter(_zip, "UTF-8"));
@@ -102,7 +92,7 @@ public class WorkerS3Sink extends WorkerSink {
       }
     }
     catch (IOException ioe) {
-      _log.info(ioe.getStackTrace());
+      _log.error(Joiner.on("\n").join(ioe.getStackTrace()));
       return;
     }
     finally {

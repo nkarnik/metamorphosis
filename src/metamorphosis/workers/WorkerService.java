@@ -40,12 +40,13 @@ public abstract class WorkerService<T extends Worker> {
   private RoundRobinByTopicMessageQueue _topicMessageQueue = new RoundRobinByTopicMessageQueue();
   protected KafkaService _kafkaService;
   protected WorkerFactory<T> _workerFactory;
-  protected String _queueNumber;
+  protected int _queueNumber;
 
   public WorkerService(String sourceTopic, KafkaService kafkaService, WorkerFactory<T> workerFactory) {
     _kafkaService = kafkaService;
     _sourceTopic = sourceTopic;
-    _queueNumber = _sourceTopic.substring(_sourceTopic.length() - 1, _sourceTopic.length());
+    String[] split = _sourceTopic.split("_");
+    _queueNumber = Integer.parseInt(split[split.length - 1]);
     _workerFactory = workerFactory;
   }
 
@@ -67,21 +68,20 @@ public abstract class WorkerService<T extends Worker> {
         _log.info("Entering round robin pop thread");
         while(isRunning.get()){
           //Blocking pop
-          _log.info("About to pop from round robin...");
           try {
             final JSONObject poppedMessage = _topicMessageQueue.pop();
             if(poppedMessage == null){
               continue; // Happens when the pop is interrupted
             }
             //Using the executorPool's internal q to send in callables
-            _log.info(this + " is passing to executor: " + poppedMessage.toString());
+            _log.debug(this + " is passing to executor: " + poppedMessage.toString());
             
             _executorPool.submit(new Callable<String>(){
               @Override
               public String call() throws Exception {
-                _log.info("Processing message: " + poppedMessage.toString());
+                _log.debug("Processing message: " + poppedMessage.toString());
                 processMessage(poppedMessage);
-                _log.info("Completed processing message: " + poppedMessage.toString());
+                _log.debug("Completed processing message: " + poppedMessage.toString());
                 
                 return null;
               }
@@ -110,7 +110,7 @@ public abstract class WorkerService<T extends Worker> {
         ConsumerIterator<String, JSONObject> iterator = getMessageTopicIterator();
         while(isRunning.get()){
           try{
-            _log.info("waiting on kafka topic iterator...");
+            _log.debug("waiting on kafka topic iterator...");
         
             // Blocking wait on source topic
             while(iterator.hasNext()){
@@ -119,7 +119,7 @@ public abstract class WorkerService<T extends Worker> {
               _topicMessageQueue.push(messageAndMeta);
             }
           }catch(ConsumerTimeoutException e){
-            _log.info("No messages yet on " + _sourceTopic + ". Blocking on iterator.hasNext...");
+            _log.debug("No messages yet on " + _sourceTopic + ". Blocking on iterator.hasNext...");
           }
         }
         _log.info("Done with the shard service loop");

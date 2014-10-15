@@ -212,7 +212,7 @@ public class KafkaUtils {
     props.put("zookeeper.sync.time.ms", "2000");
     props.put("auto.commit.interval.ms", "10000");
     props.put("auto.offset.reset", "smallest");
-    props.put("consumer.timeout.ms", "2000");
+    props.put("consumer.timeout.ms", "60000");
     return props;
   }
   

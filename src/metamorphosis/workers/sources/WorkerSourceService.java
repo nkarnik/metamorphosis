@@ -35,7 +35,6 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
     Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
 
     // Distribute strategy
-    _log.info("sending messages to " + Joiner.on(',').join(_kafkaService.getSeedBrokers()));
     int msgsSent = 0;
     List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
     try{
@@ -51,9 +50,9 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
       
     }finally{
       File cachedFile = messageIteratorPair.getValue0();
-      _log.info("Messages sent: " + msgsSent);
+      _log.info("Messages sent: " + msgsSent + " from file:\t" + cachedFile.getAbsolutePath());
       if(cachedFile != null && cachedFile.exists()){
-        _log.info("Deleting cached file: " + cachedFile.getAbsolutePath());
+        _log.debug("Deleting cached file: " + cachedFile.getAbsolutePath());
         cachedFile.delete();
       }
       //Create the producer for this distribution

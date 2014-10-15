@@ -164,7 +164,7 @@ public class SchlossService {
               // Do nothing
             }else{
               // Create topic with default settings
-              kafkaService.createTopic(topic, 20, 1);
+              kafkaService.createTopic(topic, 20, 1); 
             }
             SchlossDistributor schlossSource = _factory.createSchlossDistributor(message);
             List<String> workerQueueMessages = schlossSource.getWorkerMessages();
@@ -172,7 +172,7 @@ public class SchlossService {
             
           }
         }catch(ConsumerTimeoutException e){
-          _log.info("No messages yet on " + _messageQueue + ". Blocking on iterator.hasNext...");
+          _log.debug("No messages yet on " + _messageQueue + ". Blocking on iterator.hasNext...");
         }
       }
       _log.info("Done with the schloss service loop");

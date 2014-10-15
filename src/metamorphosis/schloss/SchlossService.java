@@ -22,6 +22,7 @@ import kafka.producer.ProducerConfig;
 import kafka.serializer.StringDecoder;
 import kafka.utils.TestUtils;
 import kafka.utils.VerifiableProperties;
+import metamorphosis.kafka.KafkaService;
 import metamorphosis.schloss.sinks.SchlossSink;
 import metamorphosis.schloss.sinks.SchlossSinkFactory;
 import metamorphosis.schloss.sources.SchlossSource;
@@ -98,7 +99,10 @@ public class SchlossService {
     StringDecoder stringDecoder = new StringDecoder(new VerifiableProperties());
     KafkaStream<String,JSONObject> kafkaStream = consumer.createMessageStreams(topicCountMap, stringDecoder, new JSONDecoder()).get(messageTopic).get(0);
     ConsumerIterator<String, JSONObject> iterator = kafkaStream.iterator();
-    _log.info("Consumer " + clientName + " instantiated");
+    _log.info("Consumer " + clientName + " instantiated with properties: ");
+    _log.info("");
+    _log.info(defaultProperties);
+    _log.info("");
     return iterator;
   }
   
@@ -152,7 +156,16 @@ public class SchlossService {
           while(iterator.hasNext()){
             MessageAndMetadata<String, JSONObject> next = iterator.next();
             JSONObject message = next.message();
+            String topic = message.getString("topic");
+            
             _log.debug("Processing message: " + message.toString());
+            KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
+            if(kafkaService.hasTopic(topic)){
+              // Do nothing
+            }else{
+              // Create topic with default settings
+              kafkaService.createTopic(topic, 20, 1);
+            }
             SchlossDistributor schlossSource = _factory.createSchlossDistributor(message);
             List<String> workerQueueMessages = schlossSource.getWorkerMessages();
             distributeMessagesToQueues(_workerQueues, workerQueueMessages);

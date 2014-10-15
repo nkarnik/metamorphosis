@@ -34,6 +34,8 @@ public class WorkerS3Sink extends WorkerSink {
   private BufferedWriter _writer;
   private GZIPOutputStream _zip;
   private JSONObject _sinkObject;
+
+  private String _shardPrefix;
   private static long MIN_SHARD_SIZE = 50 * 1000 * 1000;
 
   public WorkerS3Sink(JSONObject message) {
@@ -43,6 +45,7 @@ public class WorkerS3Sink extends WorkerSink {
     JSONObject config = _sinkObject.getJSONObject("config");
     _bucketName = config.getString("bucket");
     _shardPath = config.getString("shard_path");
+    _shardPrefix = config.getString("shard_prefix");
     _topicToRead = message.getString("topic");
     _bytesFetched = 0;
   }
@@ -58,8 +61,8 @@ public class WorkerS3Sink extends WorkerSink {
   public void sink(ConsumerIterator<String, String> iterator, int queueNumber) {
     
     int shardNum = queueNumber * 1000 + _sinkObject.getInt("retry");
-    _shardFull = _shardPath + _topicToRead + shardNum + ".gz";
-    String gzFileToWrite = "/tmp/" + _topicToRead + shardNum + ".gz";
+    _shardFull = _shardPath + _shardPrefix + shardNum + ".gz";
+    String gzFileToWrite = "/tmp/" + _shardPrefix + shardNum + ".gz";
 
     try {
       _file = new File(gzFileToWrite);

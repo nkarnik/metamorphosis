@@ -43,6 +43,12 @@ public class MetamorphosisService {
         .withType(String.class)
         .create()
         );
+    availOptions.addOption(OptionBuilder
+        .hasArg()
+        .withLongOpt("environment")
+        .withType(String.class)
+        .create()
+        );
     
     availOptions.addOption(OptionBuilder
         .hasArg()
@@ -131,7 +137,7 @@ public class MetamorphosisService {
       exitWithHelp(availOptions);
       return;
     }
-    
+    Config.singleton().put("environment", options.getOptionValue("environment"));
     Config.singleton().put("kafka.brokers", options.getOptionValue("kafka.brokers", "192.168.111.107:9092,192.168.111.108:9092"));
     String zkHost = options.getOptionValue("kafka.zookeeper.host", "192.168.111.106");
     String zkPort = options.getOptionValue("kafka.zookeeper.port", "2181");

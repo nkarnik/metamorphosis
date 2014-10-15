@@ -88,6 +88,7 @@ mvn clean compile; \
 mvn exec:exec -Dexec.classpathScope=\"compile\" -Dexec.executable=\"java\" \
 -Dexec.args=\"#{jvm_debug} -Xmx8g -classpath %classpath \
 metamorphosis.MetamorphosisService\
+ --environment #{env}
  --kafka.brokers #{kafka_brokers_hosts_string}\
  --kafka.zookeeper.host #{kafka_zookeeper}\
  --kafka.consumer.timeout.ms #{kafka_consumer_timeout}\

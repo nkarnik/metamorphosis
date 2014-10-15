@@ -9,6 +9,7 @@ import kafka.producer.Producer;
 import kafka.producer.ProducerConfig;
 import kafka.utils.TestUtils;
 import metamorphosis.kafka.KafkaService;
+import metamorphosis.utils.Utils;
 import metamorphosis.workers.WorkerService;
 import net.sf.json.JSONObject;
 
@@ -31,8 +32,17 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
     WorkerSource workerSource = _workerFactory.createWorker(poppedMessage);
     Pair<File,Iterable<String>> messageIteratorPair = workerSource.getMessageIterator();
     Iterable<String> messageIterator = messageIteratorPair.getValue1();
-    Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_kafkaService.getSeedBrokers()), "kafka.producer.DefaultPartitioner");
-    Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
+    Properties props = new Properties();
+    props.put("metadata.broker.list", Joiner.on(",").join(_kafkaService.getSeedBrokers()));
+    props.put("serializer.class", "kafka.serializer.StringEncoder");
+    props.put("partitioner.class", "kafka.producer.DefaultPartitioner");
+    props.put("partitioner.type", "async");
+    props.put("queue.buffering.max.ms", "3000");
+    props.put("queue.buffering.max.messages", "200");
+    props.put("compression.codec", "snappy");
+    props.put("request.required.acks", "1");
+    
+    Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(props));
 
     // Distribute strategy
     int msgsSent = 0;

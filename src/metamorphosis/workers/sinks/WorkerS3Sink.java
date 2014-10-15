@@ -28,7 +28,6 @@ public class WorkerS3Sink extends WorkerSink {
   private String _bucketName;
   private String _shardPath;
   private int _bytesFetched;
-  private String _gzFileToWrite;
   private File _file;
 
   private String _shardFull;
@@ -46,8 +45,6 @@ public class WorkerS3Sink extends WorkerSink {
     _shardPath = config.getString("shard_path");
     _topicToRead = message.getString("topic");
     _bytesFetched = 0;
-
-    _log.info("Shard name is: " + _gzFileToWrite);
   }
 
 
@@ -66,7 +63,7 @@ public class WorkerS3Sink extends WorkerSink {
 
     try {
       _file = new File(gzFileToWrite);
-      _log.debug("Created File locally...");
+      _log.debug("Created File locally: " + gzFileToWrite);
     
       _zip = new GZIPOutputStream(new FileOutputStream(_file));
       _writer = new BufferedWriter(new OutputStreamWriter(_zip, "UTF-8"));

@@ -172,7 +172,7 @@ public class SchlossService {
             
           }
         }catch(ConsumerTimeoutException e){
-          _log.info("No messages yet on " + _messageQueue + ". Blocking on iterator.hasNext...");
+          _log.debug("No messages yet on " + _messageQueue + ". Blocking on iterator.hasNext...");
         }
       }
       _log.info("Done with the schloss service loop");

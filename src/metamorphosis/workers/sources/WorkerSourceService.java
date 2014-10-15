@@ -60,8 +60,8 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
       
     }finally{
       File cachedFile = messageIteratorPair.getValue0();
-      _log.info("Messages sent: " + msgsSent + " from file:\t" + cachedFile.getAbsolutePath());
-      _log.info("Bytes sent : " + bytesReceived + " from file:\t" + cachedFile.getAbsolutePath());
+      _log.info("Messages sent: " + msgsSent + ". Bytes: " + bytesReceived + " from file:\t" + cachedFile.getAbsolutePath());
+      
       if(cachedFile != null && cachedFile.exists()){
         _log.debug("Deleting cached file: " + cachedFile.getAbsolutePath());
         cachedFile.delete();

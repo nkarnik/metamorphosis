@@ -32,6 +32,8 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
     Pair<File,Iterable<String>> messageIteratorPair = workerSource.getMessageIterator();
     Iterable<String> messageIterator = messageIteratorPair.getValue1();
     Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_kafkaService.getSeedBrokers()), "kafka.producer.DefaultPartitioner");
+    properties.put("compression.codec", "snappy");
+    
     Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
 
     // Distribute strategy

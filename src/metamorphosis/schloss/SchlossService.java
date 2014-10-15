@@ -164,7 +164,7 @@ public class SchlossService {
               // Do nothing
             }else{
               // Create topic with default settings
-              kafkaService.createTopic(topic, 20, 1);
+              kafkaService.createTopic(topic, 20, 1); 
             }
             SchlossDistributor schlossSource = _factory.createSchlossDistributor(message);
             List<String> workerQueueMessages = schlossSource.getWorkerMessages();

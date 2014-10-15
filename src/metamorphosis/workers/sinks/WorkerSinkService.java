@@ -16,6 +16,7 @@ import kafka.serializer.StringDecoder;
 import kafka.utils.TestUtils;
 import kafka.utils.VerifiableProperties;
 import metamorphosis.kafka.KafkaService;
+import metamorphosis.utils.ExponentialBackoffTicker;
 import metamorphosis.utils.KafkaUtils;
 import metamorphosis.workers.WorkerService;
 import net.sf.json.JSONObject;
@@ -31,6 +32,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
   private Logger _log = Logger.getLogger(WorkerSinkService.class);
   private ConsumerConnector _consumer;
   HashMap<String, ConsumerIterator<String, String>> _topicToIteratorCache = Maps.newHashMap();
+  ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(100);
   
   public WorkerSinkService(String sourceTopic, KafkaService kafkaService) {
     super(sourceTopic, kafkaService, new WorkerSinkFactory());
@@ -38,13 +40,12 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
 
   @Override
   protected void processMessage(JSONObject poppedMessage) {
-    _log.info("About to consume from sink topic");
     WorkerSink workerSink = _workerFactory.createWorker(poppedMessage);
     String topic = poppedMessage.getString("topic");
     String clientName = topic;
     ConsumerIterator<String, String> sinkTopicIterator;
     if(_topicToIteratorCache.containsKey(topic)){
-      _log.info("Using cached iterator");
+      _log.debug("Using cached iterator for topic: " + topic);
       sinkTopicIterator = _topicToIteratorCache.get(topic);
     }else{
       ConsumerConfig consumerConfig = KafkaUtils.createConsumerConfig(_kafkaService.getZKConnectString(), clientName);
@@ -71,7 +72,9 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
     Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_kafkaService.getSeedBrokers()), "kafka.producer.DefaultPartitioner");
     Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
     producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
-    _log.info("Sending message: " + poppedMessage.toString() + " to topic: " + _sourceTopic);
+    if(_ticker.tick()){
+      _log.info("[sampled #" + _ticker.counter() + "] Sending message: " + poppedMessage.toString() + " to topic: " + _sourceTopic);
+    }
     producer.close(); 
 
   }

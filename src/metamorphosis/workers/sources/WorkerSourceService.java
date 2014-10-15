@@ -37,15 +37,17 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
     // Distribute strategy
     _log.info("sending messages to " + Joiner.on(',').join(_kafkaService.getSeedBrokers()));
     int msgsSent = 0;
+    List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
     try{
       for( String workerQueueMessage : messageIterator) {
         String topicQueue = workerSource.getTopic();
         //_log.info("Sending message " + workerQueueMessage + " to queue: " + topic);
-        List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
+        
         messages.add(new KeyedMessage<Integer,String>(topicQueue,workerQueueMessage));
-        producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
+        
         msgsSent++;
       }
+      producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
       
     }finally{
       File cachedFile = messageIteratorPair.getValue0();

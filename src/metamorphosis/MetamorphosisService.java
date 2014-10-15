@@ -138,7 +138,7 @@ public class MetamorphosisService {
     Config.singleton().put("kafka.zookeeper.host", zkHost);
     Config.singleton().put("kafka.zookeeper.port", zkPort);
     Config.singleton().put("kafka.zookeeper.connect",zkHost + ":" + zkPort + "/kafka");
-    Config.singleton().put("kafka.consumer.timeout.ms", "1000");
+    Config.singleton().put("kafka.consumer.timeout.ms", options.getOptionValue("kafka.consumer.timeout.ms"));
     String service = options.getOptionValue("service");
 
     KafkaService kafkaService = new KafkaService();

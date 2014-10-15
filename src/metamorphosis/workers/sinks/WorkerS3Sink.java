@@ -7,9 +7,6 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.util.zip.GZIPOutputStream;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.log4j.Logger;
-
 import kafka.consumer.ConsumerIterator;
 import kafka.consumer.ConsumerTimeoutException;
 import kafka.message.MessageAndMetadata;
@@ -17,6 +14,8 @@ import metamorphosis.utils.KafkaUtils;
 import metamorphosis.utils.s3.S3Exception;
 import metamorphosis.utils.s3.S3Util;
 import net.sf.json.JSONObject;
+
+import org.apache.log4j.Logger;
 
 public class WorkerS3Sink extends WorkerSink {
   
@@ -43,7 +42,7 @@ public class WorkerS3Sink extends WorkerSink {
 
   private JSONObject _sinkObject;
   
-  private static int MIN_SHARD_SIZE = 50000000;
+  private static long MIN_SHARD_SIZE = 50 * 1000 * 1000;
 
   public WorkerS3Sink(JSONObject message) {
     // TODO Auto-generated constructor stub
@@ -84,7 +83,6 @@ public class WorkerS3Sink extends WorkerSink {
       try{
         while (iterator.hasNext()) {
           MessageAndMetadata<String, String> fetchedMessage = iterator.next();
-          _log.info("Consumer ("+ iterator.clientId() + ") Retreived message offset to sink from topic " + _topicToRead + " is " + fetchedMessage.offset());
           String messageBody = fetchedMessage.message();
           int messageSize = messageBody.getBytes("UTF-8").length;
           _bytesFetched += messageSize;
@@ -92,7 +90,8 @@ public class WorkerS3Sink extends WorkerSink {
           _writer.newLine();
           _writer.flush();
           if (maybeFlush(false)) {
-            _log.info("Flushed shard to S3");
+            _log.info("Consumer ("+ iterator.clientId() + ") Retreived message offset to sink from topic " + _topicToRead + " is " + fetchedMessage.offset());
+            _log.info("Flushed shard to S3: " + _shardFull);
             _writer.close();
             return;
           }
@@ -123,19 +122,19 @@ public class WorkerS3Sink extends WorkerSink {
 
   
   protected boolean maybeFlush(boolean forceFlush) {
-    _log.info("Fetched " +_bytesFetched + " so far...");
+    _log.debug("Fetched " +_bytesFetched + " so far...");
     if (_bytesFetched > 0 && (forceFlush || _bytesFetched > MIN_SHARD_SIZE)) {
       try {
         _writer.close();
-        _log.info("File path is: " + _file.getAbsolutePath() + " with length " + _file.length());
+        _log.debug("File path is: " + _file.getAbsolutePath() + " with length " + _file.length());
         S3Util.copyFile(_file, _bucketName, _shardFull);
-        _log.info("Copied " + _file.getAbsolutePath() + " to " + _shardFull);
+        _log.debug("Copied " + _file.getAbsolutePath() + " to " + _shardFull);
         return true;
       } catch (S3Exception | IOException e) {
         _log.error("Flush failed: ", e);
         return false;
       } finally {
-        _log.info("Deleting file: " + _file.getAbsolutePath());
+        _log.debug("Deleting file: " + _file.getAbsolutePath());
         _file.delete();
       }
     }

@@ -2,9 +2,7 @@
 
 require "optparse"
 require 'json'
-require 'hipchat'
-require 'pp'
-
+require 'pry'
 HIPCHAT_API_TOKEN = "41005d1d7b1a5cdc86dc2d9db1b620"
 HIPCHAT_MAIN_ROOM = "Zillabyte"
 DEFAULT_KAFKA_PORT = 9092
@@ -39,22 +37,48 @@ end
 opt_parser.parse!
 env = ARGV.shift
 service = ARGV.shift
-
+hostname = `hostname`.chomp + ".ec2.internal"
+puts "hostname is #{hostname}"
 
 kafka_brokers = find_nodes(env, "kafka_broker")
-kafka_brokers_hosts_string = kafka_brokers.map{|b| b + ":#{DEFAULT_KAFKA_PORT}"}.join(',')
+puts "List of brokers found: #{kafka_brokers.join(',')}"
 
+kafka_brokers_hosts_string = kafka_brokers.map{|b| b + ":#{DEFAULT_KAFKA_PORT}"}.join(',')
 kafka_zookeeper = find_nodes(env, "kafka_zookeeper").first()
 
-metamorphosis_source_topic = "source_queue"
-metamorphosis_sink_topic = "sink_queue"
 
-
-worker_source_queues = "producer_queue_0,producer_queue_1"
-worker_sink_queues = "consumer_queue_0,consumer_queue_1"
-worker_source_queue = "producer_queue_0"
-worker_sink_queue = "consumer_queue_0"
+case service
+when "schloss"
+  metamorphosis_source_topic = "source_queue"
+  metamorphosis_sink_topic = "sink_queue"
+  worker_source_queues = kafka_brokers.size.times.map{|i| "worker_source_queue_#{i}"}.join(",")
+  worker_sink_queues = kafka_brokers.size.times.map{|i| "worker_sink_queue_#{i}"}.join(",")
+  service_args = <<-SARGS
+ --schloss.source.queue #{metamorphosis_source_topic}\
+ --schloss.sink.queue #{metamorphosis_sink_topic}\
+ --worker.source.queues #{worker_source_queues}\
+ --worker.sink.queues #{worker_sink_queues}
+SARGS
+when "worker"
+  broker_num = kafka_brokers.sort.index hostname
+  if broker_num.nil?
+    puts "ERROR: Cannot assign broker num. #{hostname} is not found in the list of brokers: #{kafka_brokers.join(",")}"
+    exit
+  end
+  puts "Queue num is #{broker_num}"
+  
+  worker_source_queue = "worker_source_queue_#{broker_num}"
+  worker_sink_queue = "worker_sink_queue_#{broker_num}"
+  service_args = <<-SARGS
+ --worker.source.queue #{worker_source_queue}\
+ --worker.sink.queue #{worker_sink_queue}
+SARGS
+else
+  puts "Unsupported service: #{service}"
+  exit
+end
 kafka_consumer_timeout = "60000"
+
 #To allow debugging from eclipse while running on vagrant/test/prod. add at the start of -Dexec.args="
 jvm_debug=""
 #jvm_debug="-Xdebug -Xrunjdwp:transport=dt_socket,address=8001,server=y,suspend=y"
@@ -67,16 +91,11 @@ metamorphosis.MetamorphosisService\
  --kafka.brokers #{kafka_brokers_hosts_string}\
  --kafka.zookeeper.host #{kafka_zookeeper}\
  --kafka.consumer.timeout.ms #{kafka_consumer_timeout}\
- --schloss.source.queue #{metamorphosis_source_topic}\
- --schloss.sink.queue #{metamorphosis_sink_topic}\
- --worker.source.queues #{worker_source_queues}\
- --worker.sink.queues #{worker_sink_queues}\
- --worker.source.queue #{worker_source_queue}\
- --worker.sink.queue #{worker_sink_queue}\
  --service #{service}\
-\"
+ #{service_args}\"
 CMD
 puts command
+
 system command
 
 

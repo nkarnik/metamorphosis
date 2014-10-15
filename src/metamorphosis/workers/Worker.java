@@ -1,9 +1,13 @@
 package metamorphosis.workers;
 
+import java.io.File;
+
+import org.javatuples.Pair;
+
 
 public interface Worker {
   
-  public Iterable<String> getMessageIterator();
+  public Pair<File, Iterable<String>> getMessageIterator();
 
   public String getTopic();
 

@@ -22,6 +22,7 @@ import kafka.producer.ProducerConfig;
 import kafka.serializer.StringDecoder;
 import kafka.utils.TestUtils;
 import kafka.utils.VerifiableProperties;
+import metamorphosis.kafka.KafkaService;
 import metamorphosis.schloss.sinks.SchlossSink;
 import metamorphosis.schloss.sinks.SchlossSinkFactory;
 import metamorphosis.schloss.sources.SchlossSource;
@@ -86,7 +87,7 @@ public class SchlossService {
   private ConsumerIterator<String, JSONObject> getIterator(String messageTopic) {
     String clientName = "schloss_service_consumer_" + messageTopic;
     Properties defaultProperties = KafkaUtils.getDefaultProperties(_zkConnectString, clientName);
-    String consumerTimeout = Config.singleton().get("kafka.consumer.timeout.ms", "1000");
+    String consumerTimeout = Config.singleton().getOrException("kafka.consumer.timeout.ms");
     defaultProperties.put("consumer.timeout.ms", consumerTimeout);
     
     ConsumerConfig consumerConfig = KafkaUtils.createConsumerConfig(_zkConnectString, clientName);
@@ -98,7 +99,10 @@ public class SchlossService {
     StringDecoder stringDecoder = new StringDecoder(new VerifiableProperties());
     KafkaStream<String,JSONObject> kafkaStream = consumer.createMessageStreams(topicCountMap, stringDecoder, new JSONDecoder()).get(messageTopic).get(0);
     ConsumerIterator<String, JSONObject> iterator = kafkaStream.iterator();
-    _log.info("Consumer " + clientName + " instantiated");
+    _log.info("Consumer " + clientName + " instantiated with properties: ");
+    _log.info("");
+    _log.info(defaultProperties);
+    _log.info("");
     return iterator;
   }
   
@@ -152,7 +156,16 @@ public class SchlossService {
           while(iterator.hasNext()){
             MessageAndMetadata<String, JSONObject> next = iterator.next();
             JSONObject message = next.message();
-            _log.info("Processing message: " + message.toString());
+            String topic = message.getString("topic");
+            
+            _log.debug("Processing message: " + message.toString());
+            KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
+            if(kafkaService.hasTopic(topic)){
+              // Do nothing
+            }else{
+              // Create topic with default settings
+              kafkaService.createTopic(topic, 20, 1); 
+            }
             SchlossDistributor schlossSource = _factory.createSchlossDistributor(message);
             List<String> workerQueueMessages = schlossSource.getWorkerMessages();
             distributeMessagesToQueues(_workerQueues, workerQueueMessages);
@@ -174,13 +187,15 @@ public class SchlossService {
     super(messageTopic, "worker.source.queues", new SchlossSourceFactory());
   }
   
-  public void distributeMessagesToQueues(String[] _workerQueues, List<String> workerQueueMessages) {
+  public void distributeMessagesToQueues(String[] workerQueues, List<String> workerQueueMessages) {
     // Distribute strategy
+    _log.info("Distributing " + workerQueueMessages.size() + " messages to " + workerQueues.length + " brokers.");
     List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
     for( String workerQueueMessage : workerQueueMessages) {
-      int numQueues = _workerQueues.length;
-      String workerQueueTopic = _workerQueues[_queueToPush % numQueues];
-      _log.info("Distributing message  to queue: " + workerQueueTopic + " msg:: " + workerQueueMessage);
+      int numQueues = workerQueues.length;
+      String workerQueueTopic = workerQueues[_queueToPush % numQueues];
+      
+      _log.debug("Distributing message  to queue: " + workerQueueTopic + " msg:: " + workerQueueMessage);
       messages.add(new KeyedMessage<Integer,String>(workerQueueTopic,workerQueueMessage));
       _queueToPush += 1;
     }
@@ -188,7 +203,8 @@ public class SchlossService {
     Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_brokers), "kafka.producer.DefaultPartitioner");
     Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
     producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
-    producer.close(); 
+    producer.close();
+    _log.info("Done with distribution.");
     
   }
  }

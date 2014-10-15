@@ -7,6 +7,8 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import kafka.message.MessageAndMetadata;
+import metamorphosis.utils.BackoffTicker;
+import metamorphosis.utils.ExponentialBackoffTicker;
 import metamorphosis.utils.Utils;
 import net.sf.json.JSONObject;
 
@@ -20,7 +22,8 @@ public class RoundRobinByTopicMessageQueue {
   private ArrayList<String> _topics;
   private Logger _log = Logger.getLogger(RoundRobinByTopicMessageQueue.class);
   private AtomicBoolean _interrupted;
-
+  private ExponentialBackoffTicker _pushTicker = new ExponentialBackoffTicker(100);
+  private ExponentialBackoffTicker _popTicker = new ExponentialBackoffTicker(100);
   public RoundRobinByTopicMessageQueue() {
     
     _queues = new HashMap<String, ConcurrentLinkedQueue<JSONObject>>();
@@ -48,7 +51,10 @@ public class RoundRobinByTopicMessageQueue {
     }
     queue.add(message);    
     _remainingMessages += 1;
-    _log.info("Pushed message into round robin. Current remaining messages: " + _remainingMessages);
+    if(_popTicker.tick()){
+      _log.info("[sampled #" + _popTicker.counter() + "] Pushed message into round robin. Current remaining messages: " + _remainingMessages);
+      
+    }
   }
   
   /**
@@ -63,7 +69,7 @@ public class RoundRobinByTopicMessageQueue {
     do {
   
       if(_topics.size() == 0){
-        _log .info("No topics in the round robin, waiting...");
+        _log.debug("No topics in the round robin, waiting...");
         Utils.sleep(1000);
         continue;
       }
@@ -78,14 +84,16 @@ public class RoundRobinByTopicMessageQueue {
       topicsSeen++;
       
       if(topicsSeen == size){
-        _log .info("No messages in the round robin, waiting...");
+        _log.debug("No messages in the round robin, waiting...");
         topicsSeen = 0;
         Utils.sleep(1000);
       }
       
     } while (popped == null && !_interrupted.get() );
     _remainingMessages -= 1;
-    _log.info("Popped message from round robin. Current remaining messages: " + _remainingMessages);
+    if(_pushTicker.tick()){
+      _log.info("[sampled #" + _pushTicker.counter() + "] Popped message from round robin. Current remaining messages: " + _remainingMessages);
+    }
 
     return popped;
   }

@@ -16,6 +16,7 @@ import kafka.serializer.StringDecoder;
 import kafka.utils.TestUtils;
 import kafka.utils.VerifiableProperties;
 import metamorphosis.kafka.KafkaService;
+import metamorphosis.utils.ExponentialBackoffTicker;
 import metamorphosis.utils.KafkaUtils;
 import metamorphosis.workers.WorkerService;
 import net.sf.json.JSONObject;
@@ -24,26 +25,43 @@ import org.apache.log4j.Logger;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 public class WorkerSinkService extends WorkerService<WorkerSink> {
 
   private Logger _log = Logger.getLogger(WorkerSinkService.class);
   private ConsumerConnector _consumer;
-
+  HashMap<String, ConsumerIterator<String, String>> _topicToIteratorCache = Maps.newHashMap();
+  ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(100);
+  
   public WorkerSinkService(String sourceTopic, KafkaService kafkaService) {
     super(sourceTopic, kafkaService, new WorkerSinkFactory());
   }
 
   @Override
   protected void processMessage(JSONObject poppedMessage) {
-    // TODO What do we do with this popped message?
-    _log.info("About to consume from sink topic");
     WorkerSink workerSink = _workerFactory.createWorker(poppedMessage);
     String topic = poppedMessage.getString("topic");
-    ConsumerIterator<String, String> sinkTopicIterator = getSinkTopicIterator(topic);
+    String clientName = topic;
+    ConsumerIterator<String, String> sinkTopicIterator;
+    if(_topicToIteratorCache.containsKey(topic)){
+      _log.debug("Using cached iterator for topic: " + topic);
+      sinkTopicIterator = _topicToIteratorCache.get(topic);
+    }else{
+      ConsumerConfig consumerConfig = KafkaUtils.createConsumerConfig(_kafkaService.getZKConnectString(), clientName);
+      _consumer = kafka.consumer.Consumer.createJavaConsumerConnector(consumerConfig);
+      _log.info("New consumer created: " + _consumer.hashCode());
+      
+      Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
+      topicCountMap.put(topic, new Integer(1)); // This consumer will only have one thread
+      StringDecoder stringDecoder = new StringDecoder(new VerifiableProperties());
+      
+      sinkTopicIterator = _consumer.createMessageStreams(topicCountMap, stringDecoder, stringDecoder).get(topic).get(0).iterator();
+      _log.info("Consumer " + clientName + " instantiated");
+      _topicToIteratorCache.put(topic,sinkTopicIterator);
+    }
     workerSink.sink(sinkTopicIterator, _queueNumber);
-    _log.info("Shutting down consumer: " + _consumer.hashCode());
-    _consumer.shutdown();
+    
     //streaming sink, so have to increment retry and push back to worker queue
     int retry = 1 + poppedMessage.getJSONObject("sink").getInt("retry");
     poppedMessage.getJSONObject("sink").element("retry", retry);
@@ -54,23 +72,11 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
     Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_kafkaService.getSeedBrokers()), "kafka.producer.DefaultPartitioner");
     Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
     producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
-    _log.info("Sending message: " + poppedMessage.toString() + " to topic: " + _sourceTopic);
+    if(_ticker.tick()){
+      _log.info("[sampled #" + _ticker.counter() + "] Sending message: " + poppedMessage.toString() + " to topic: " + _sourceTopic);
+    }
     producer.close(); 
 
-  }
-  
-  private ConsumerIterator<String, String> getSinkTopicIterator(String topicName) {
-    String clientName = topicName;
-    ConsumerConfig consumerConfig = KafkaUtils.createConsumerConfig(_kafkaService.getZKConnectString(), clientName);
-    _consumer = kafka.consumer.Consumer.createJavaConsumerConnector(consumerConfig);
-    _log.info("New consumer created: " + _consumer.hashCode());
-    Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
-    topicCountMap.put(topicName, new Integer(1)); // This consumer will only have one thread
-    StringDecoder stringDecoder = new StringDecoder(new VerifiableProperties());
-    KafkaStream<String,String> kafkaStream = _consumer.createMessageStreams(topicCountMap, stringDecoder, stringDecoder).get(topicName).get(0);
-    ConsumerIterator<String, String> iterator = kafkaStream.iterator();
-    _log.info("Consumer " + clientName + " instantiated");
-    return iterator;
   }
   
   

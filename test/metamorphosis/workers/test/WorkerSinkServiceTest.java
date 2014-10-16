@@ -1,19 +1,25 @@
 package metamorphosis.workers.test;
 
+import static org.junit.Assert.assertEquals;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import metamorphosis.kafka.LocalKafkaService;
 import metamorphosis.utils.Config;
+import metamorphosis.utils.s3.S3Exception;
+import metamorphosis.utils.s3.S3Util;
 import metamorphosis.workers.WorkerService;
 import metamorphosis.workers.sinks.WorkerSink;
 import metamorphosis.workers.sinks.WorkerSinkService;
 import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;
 
-import org.apache.commons.lang.NotImplementedException;
 import org.apache.log4j.Logger;
+import org.jets3t.service.S3ServiceException;
+import org.jets3t.service.model.S3Object;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -57,18 +63,22 @@ public class WorkerSinkServiceTest {
   }
 
   @Test
-  public void testSingleWorkerS3Sink() throws InterruptedException, ExecutionException{
+  public void testSingleWorkerS3Sink() throws InterruptedException, ExecutionException, S3ServiceException, S3Exception, IOException{
     
     JSONBuilder builder = new JSONStringer();
+    String bucket = "buffer.zillabyte.com";
+    String shardPath = "dev/single_worker_test/";
+    S3Util.recursiveDeletePath(bucket, shardPath);
+    
     builder.object()
     .key("topic").value(TOPIC_TO_SINK)
     .key("sink").object()
         .key("type").value("s3")
         .key("retry").value(0)
         .key("config").object()
-          .key("shard_path").value("test/single_worker/")
+          .key("shard_path").value(shardPath)
           .key("shard_prefix").value("test_shard_")
-          .key("bucket").value("buffer.zillabyte.com")
+          .key("bucket").value(bucket)
           .key("credentials").object()
             .key("secret").value("")
             .key("access").value("")
@@ -88,17 +98,19 @@ public class WorkerSinkServiceTest {
     
     WorkerService<WorkerSink> workerService = new WorkerSinkService(thisWorkerQueue, _localKakfaService);
     workerService.start();
-    Thread.sleep(25000); // Give 10 seconds for the worker to get the message
+    Thread.sleep(3000); // Give 10 seconds for the worker to get the message
 
     _log.info("Waiting on future...");
     workerService.stop(); // Awaits executor pool to finish
     
     _log.info("Reading messages for confirmation");
-    //TODO: Figure out how to read all shards that we supposedly wrote.
     
-    //assertEquals(1000, messages);
-    throw new NotImplementedException("TDD");
-    
-
+    int numMessages = 0;
+    S3Object[] shards = S3Util.listPath(bucket, shardPath);
+    for(S3Object shard : shards){
+      numMessages += S3Util.readGzipFile(bucket, shard.getKey()).split("\n").length;
+    }
+    assertEquals(BATCHES * PER_BATCH, numMessages);
+ 
   }
 }

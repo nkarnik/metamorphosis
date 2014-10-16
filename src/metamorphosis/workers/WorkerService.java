@@ -2,6 +2,7 @@ package metamorphosis.workers;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -20,6 +21,7 @@ import kafka.message.MessageAndMetadata;
 import kafka.serializer.StringDecoder;
 import kafka.utils.VerifiableProperties;
 import metamorphosis.kafka.KafkaService;
+import metamorphosis.utils.Config;
 import metamorphosis.utils.JSONDecoder;
 import metamorphosis.utils.KafkaUtils;
 import metamorphosis.utils.Utils;
@@ -132,8 +134,10 @@ public abstract class WorkerService<T extends Worker> {
 
   private ConsumerIterator<String, JSONObject> getMessageTopicIterator() {
     String clientName = "worker_service_consumer_" + _sourceTopic;
-    ConsumerConfig consumerConfig = KafkaUtils.createConsumerConfig(_kafkaService.getZKConnectString(), clientName);
-    ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(consumerConfig);
+    Properties props = KafkaUtils.getDefaultProperties(_kafkaService.getZKConnectString(), clientName);
+    String consumerTimeout = Config.singleton().getOrException("kafka.consumer.timeout.ms");
+    props.put("consumer.timeout.ms", consumerTimeout);
+    ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(new ConsumerConfig(props));
 
     Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
     topicCountMap.put(_sourceTopic, new Integer(1)); // This consumer will only have one thread

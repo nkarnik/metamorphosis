@@ -29,6 +29,27 @@ public class MetamorphosisService {
   static String workerSinkQueues = "worker.sink.queues";
   static String workerSourceQueues = "worker.source.queues";
 
+  private static WorkerSourceService _workerSourceService;
+
+  private static WorkerSinkService _workerSinkService;
+
+  private static SchlossService _schlossService;
+  /***
+   * 
+   */
+  public static void addCleanupShutdownHooks() {
+    Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          cleanup();
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+      }      
+    }));
+  }
+  
   @SuppressWarnings("static-access")
   public static void main(String[] args) throws ParseException {
     
@@ -206,16 +227,14 @@ public class MetamorphosisService {
 
   private static void startWorkerService(KafkaService kafkaService) {
     _log.info("Starting worker services");
-    WorkerSourceService sourceService = new WorkerSourceService((String)Config.singleton().getOrException(workerSourceQueue), kafkaService);
-    WorkerSinkService sinkService = new WorkerSinkService((String)Config.singleton().getOrException(workerSinkQueue), kafkaService);
-    sourceService.start();
-    sinkService.start();
+    _workerSourceService = new WorkerSourceService((String)Config.singleton().getOrException(workerSourceQueue), kafkaService);
+    _workerSinkService = new WorkerSinkService((String)Config.singleton().getOrException(workerSinkQueue), kafkaService);
+    _workerSourceService.start();
+    _workerSinkService.start();
     while(true){
       String input = getInput();
       if(input != null && input.equals("q")){
-        sourceService.stop();
-        sinkService.stop();
-        System.exit(1);
+        cleanup();
       }else{
         _log.info("Received input: " + input);
       }
@@ -223,14 +242,25 @@ public class MetamorphosisService {
     
   }
 
+  public static void cleanup() {
+    _log.info("Cleaning up for shutdown.");
+    if(_workerSourceService != null)
+      _workerSourceService.stop();  
+    if(_workerSinkService != null)
+      _workerSinkService.stop();
+    if(_schlossService != null)
+      _schlossService.stop();
+    System.exit(1);
+  }
+
   private static void startSchlossService() {
     _log.info("Starting Schloss service");
-    SchlossService schlossService = new  SchlossService();
-    schlossService.start();
+    _schlossService = new  SchlossService();
+    _schlossService.start();
     while(true){
       String input = getInput();
       if(input != null && input.equals("q")){
-        schlossService.stop();
+        cleanup();
         System.exit(1);
       }else{
         _log.info("Received input: " + input);

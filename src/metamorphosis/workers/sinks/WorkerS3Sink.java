@@ -10,6 +10,7 @@ import java.util.zip.GZIPOutputStream;
 import kafka.consumer.ConsumerIterator;
 import kafka.consumer.ConsumerTimeoutException;
 import kafka.message.MessageAndMetadata;
+import metamorphosis.utils.ExponentialBackoffTicker;
 import metamorphosis.utils.KafkaUtils;
 import metamorphosis.utils.s3.S3Exception;
 import metamorphosis.utils.s3.S3Util;
@@ -27,7 +28,7 @@ public class WorkerS3Sink extends WorkerSink {
   private String _topicToRead;
   private String _bucketName;
   private String _shardPath;
-  private int _bytesFetched;
+  private int _numMessages;
   private File _file;
 
   private String _shardFull;
@@ -36,18 +37,24 @@ public class WorkerS3Sink extends WorkerSink {
   private JSONObject _sinkObject;
 
   private String _shardPrefix;
-  private static long MIN_SHARD_SIZE = 50 * 1000 * 1000;
+  ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(1000);
+
+  private int _retryNum;
+
+  private int _numMessagesThisShard;
 
   public WorkerS3Sink(JSONObject message) {
     // TODO Auto-generated constructor stub
     _message = message;
     _sinkObject = _message.getJSONObject("sink");
+    _retryNum = _sinkObject.getInt("retry");
     JSONObject config = _sinkObject.getJSONObject("config");
     _bucketName = config.getString("bucket");
     _shardPath = config.getString("shard_path");
     _shardPrefix = config.getString("shard_prefix");
     _topicToRead = message.getString("topic");
-    _bytesFetched = 0;
+    _numMessages = 0;
+    _numMessagesThisShard = _retryNum < 10 ? (_retryNum + 1) * 100 : 1000;
   }
 
 
@@ -60,21 +67,23 @@ public class WorkerS3Sink extends WorkerSink {
   @Override
   public void sink(ConsumerIterator<String, String> iterator, int queueNumber) {
     
-    int shardNum = queueNumber * 1000 + _sinkObject.getInt("retry");
+    int shardNum = (queueNumber + 1) * 1000 + _retryNum;
+    
     _shardFull = _shardPath + _shardPrefix + shardNum + ".gz";
-    String gzFileToWrite = "/tmp/" + _shardPrefix + shardNum + ".gz";
+    String gzFileToWrite = "/tmp/" + _shardFull;
+    
 
     try{
       _file = new File(gzFileToWrite);
-      _log.debug("Created File locally: " + gzFileToWrite);
+      _file.mkdirs();
+      _log.info("Created File locally: " + _file.getAbsolutePath());
       
       _zip = new GZIPOutputStream(new FileOutputStream(_file));
       _writer = new BufferedWriter(new OutputStreamWriter(_zip, "UTF-8"));
       while (iterator.hasNext()) {
         MessageAndMetadata<String, String> fetchedMessage = iterator.next();
         String messageBody = fetchedMessage.message();
-        int messageSize = messageBody.getBytes("UTF-8").length;
-        _bytesFetched += messageSize;
+        _numMessages += 1;
         _writer.append(messageBody);
         _writer.newLine();
         _writer.flush();
@@ -86,7 +95,10 @@ public class WorkerS3Sink extends WorkerSink {
         }
       }
     }catch(ConsumerTimeoutException e){
-      _log.info("Consumer timed out. maybe flush " + _bytesFetched + " bytes");
+      if(_ticker.tick()){
+        _log.info("[sampled #" + _ticker.counter() + "] Consumer timed out. maybe flush " + _numMessages + " messages");  
+      }
+      
       maybeFlush(true);
     }
     catch (IOException ioe) {
@@ -110,8 +122,9 @@ public class WorkerS3Sink extends WorkerSink {
 
   
   protected boolean maybeFlush(boolean forceFlush) {
-    _log.debug("Fetched " +_bytesFetched + " so far...");
-    if (_bytesFetched > 0 && (forceFlush || _bytesFetched > MIN_SHARD_SIZE)) {
+    _log.debug("Fetched " +_numMessages + " so far...");
+    
+    if (_numMessages > 0 && (forceFlush || _numMessages > _numMessagesThisShard)) {
       try {
         _writer.close();
         _log.debug("File path is: " + _file.getAbsolutePath() + " with length " + _file.length());

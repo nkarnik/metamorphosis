@@ -7,7 +7,6 @@ import java.util.Properties;
 
 import kafka.consumer.ConsumerConfig;
 import kafka.consumer.ConsumerIterator;
-import kafka.consumer.KafkaStream;
 import kafka.javaapi.consumer.ConsumerConnector;
 import kafka.producer.KeyedMessage;
 import kafka.producer.Producer;
@@ -16,6 +15,7 @@ import kafka.serializer.StringDecoder;
 import kafka.utils.TestUtils;
 import kafka.utils.VerifiableProperties;
 import metamorphosis.kafka.KafkaService;
+import metamorphosis.utils.Config;
 import metamorphosis.utils.ExponentialBackoffTicker;
 import metamorphosis.utils.KafkaUtils;
 import metamorphosis.workers.WorkerService;
@@ -48,8 +48,9 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       _log.debug("Using cached iterator for topic: " + topic);
       sinkTopicIterator = _topicToIteratorCache.get(topic);
     }else{
-      ConsumerConfig consumerConfig = KafkaUtils.createConsumerConfig(_kafkaService.getZKConnectString(), clientName);
-      _consumer = kafka.consumer.Consumer.createJavaConsumerConnector(consumerConfig);
+      Properties props = KafkaUtils.getDefaultProperties(_kafkaService.getZKConnectString(), clientName);
+      props.put("consumer.timeout.ms", Config.singleton().getOrException("kafka.consumer.timeout.ms"));
+      _consumer = kafka.consumer.Consumer.createJavaConsumerConnector(new ConsumerConfig(props));
       _log.info("New consumer created: " + _consumer.hashCode());
       
       Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
@@ -63,7 +64,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
     workerSink.sink(sinkTopicIterator, _queueNumber);
     
     //streaming sink, so have to increment retry and push back to worker queue
-    int retry = 1 + poppedMessage.getJSONObject("sink").getInt("retry");
+    int retry = poppedMessage.getJSONObject("sink").getInt("retry") + 1;
     poppedMessage.getJSONObject("sink").element("retry", retry);
     
     List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();

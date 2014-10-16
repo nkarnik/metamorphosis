@@ -64,32 +64,30 @@ public class WorkerS3Sink extends WorkerSink {
     _shardFull = _shardPath + _shardPrefix + shardNum + ".gz";
     String gzFileToWrite = "/tmp/" + _shardPrefix + shardNum + ".gz";
 
-    try {
+    try{
       _file = new File(gzFileToWrite);
       _log.debug("Created File locally: " + gzFileToWrite);
-    
+      
       _zip = new GZIPOutputStream(new FileOutputStream(_file));
       _writer = new BufferedWriter(new OutputStreamWriter(_zip, "UTF-8"));
-      try{
-        while (iterator.hasNext()) {
-          MessageAndMetadata<String, String> fetchedMessage = iterator.next();
-          String messageBody = fetchedMessage.message();
-          int messageSize = messageBody.getBytes("UTF-8").length;
-          _bytesFetched += messageSize;
-          _writer.append(messageBody);
-          _writer.newLine();
-          _writer.flush();
-          if (maybeFlush(false)) {
-            _log.info("Consumer ("+ iterator.clientId() + ") Retreived message offset to sink from topic " + _topicToRead + " is " + fetchedMessage.offset());
-            _log.info("Flushed shard to S3: " + _shardFull);
-            _writer.close();
-            return;
-          }
+      while (iterator.hasNext()) {
+        MessageAndMetadata<String, String> fetchedMessage = iterator.next();
+        String messageBody = fetchedMessage.message();
+        int messageSize = messageBody.getBytes("UTF-8").length;
+        _bytesFetched += messageSize;
+        _writer.append(messageBody);
+        _writer.newLine();
+        _writer.flush();
+        if (maybeFlush(false)) {
+          _log.info("Consumer ("+ iterator.clientId() + ") Retreived message offset to sink from topic " + _topicToRead + " is " + fetchedMessage.offset());
+          _log.info("Flushed shard to S3: " + _shardFull);
+          _writer.close();
+          return;
         }
-      }catch(ConsumerTimeoutException e){
-        _log.info("Consumer timed out, flushing for sure");
-        maybeFlush(true);
       }
+    }catch(ConsumerTimeoutException e){
+      _log.info("Consumer timed out. maybe flush " + _bytesFetched + " bytes");
+      maybeFlush(true);
     }
     catch (IOException ioe) {
       _log.error(Joiner.on("\n").join(ioe.getStackTrace()));

@@ -76,6 +76,7 @@ public class WorkerS3Sink extends WorkerSink {
     try{
       _file = new File(gzFileToWrite);
       _file.mkdirs();
+      _file.createNewFile();
       _log.info("Created File locally: " + _file.getAbsolutePath());
       
       _zip = new GZIPOutputStream(new FileOutputStream(_file));

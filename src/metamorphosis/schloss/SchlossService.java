@@ -51,7 +51,7 @@ public class SchlossService {
   private Future<String> _sourceReadThread;
   private Future<String> _sinkReadThread;
   //private KafkaService _kafkaService;
-  ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(1000);
+  ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(10);
   
   public SchlossService() {
     

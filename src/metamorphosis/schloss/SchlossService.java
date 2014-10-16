@@ -87,13 +87,11 @@ public class SchlossService {
   
   private ConsumerIterator<String, JSONObject> getIterator(String messageTopic) {
     String clientName = "schloss_service_consumer_" + messageTopic;
-    Properties defaultProperties = KafkaUtils.getDefaultProperties(_zkConnectString, clientName);
+    Properties props = KafkaUtils.getDefaultProperties(_zkConnectString, clientName);
     String consumerTimeout = Config.singleton().getOrException("kafka.consumer.timeout.ms");
-    defaultProperties.put("consumer.timeout.ms", consumerTimeout);
-    
-    ConsumerConfig consumerConfig = KafkaUtils.createConsumerConfig(_zkConnectString, clientName);
-    
-    ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(consumerConfig);
+    props.put("consumer.timeout.ms", consumerTimeout);
+        
+    ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(new ConsumerConfig(props));
 
     Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
     topicCountMap.put(messageTopic, new Integer(1)); // This consumer will only have one thread
@@ -102,7 +100,7 @@ public class SchlossService {
     ConsumerIterator<String, JSONObject> iterator = kafkaStream.iterator();
     _log.info("Consumer " + clientName + " instantiated with properties: ");
     _log.info("");
-    _log.info(defaultProperties);
+    _log.info(props);
     _log.info("");
     return iterator;
   }

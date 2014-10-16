@@ -24,6 +24,7 @@ public class SchlossTest {
   private static final String SOURCE_TOPIC = "source_queue";
   private static final String SINK_TOPIC = "sink_queue";
   private static final int NUM_BROKERS = 3;
+  private static final String CONSUMER_TIMEOUT_MS = "1000";
   private Logger _log = Logger.getLogger(SchlossTest.class);
   private LocalKafkaService _localKakfaService;
   private List<String> _workerSourceQueues;
@@ -69,10 +70,12 @@ public class SchlossTest {
     // create SchlossService
     Config.singleton().put("schloss.source.queue", SOURCE_TOPIC);
     Config.singleton().put("schloss.sink.queue", SINK_TOPIC);
+    Config.singleton().put("kafka.consumer.timeout.ms", CONSUMER_TIMEOUT_MS);
     Config.singleton().put("kafka.zookeeper.connect", _localKakfaService.getZKConnectString());
     Config.singleton().put("kafka.brokers", Joiner.on(",").join(_localKakfaService.getSeedBrokers()));
     Config.singleton().put("worker.source.queues", Joiner.on(",").join(_workerSourceQueues));
     Config.singleton().put("worker.sink.queues", Joiner.on(",").join(_workerSinkQueues));
+    Config.singleton().put("kafka.service", _localKakfaService);
     
     _localKakfaService.sendMessage(SOURCE_TOPIC, message);
     SchlossService schlossService = new SchlossService();
@@ -81,6 +84,7 @@ public class SchlossTest {
     // verify that SchlossService fills producer_qs
     Thread.sleep(15000);
 
+    schlossService.stop();
     _log.info("Reading messages for confirmation");
     List<String> receivedMessages = new ArrayList<String>();
     for (int i = 0; i < NUM_BROKERS; i++) {
@@ -91,6 +95,6 @@ public class SchlossTest {
     _log.info("Total messages on producer queues: " + receivedMessages.size());
     
     assertEquals(10, receivedMessages.size());
-    schlossService.stop();
+
   }
 }

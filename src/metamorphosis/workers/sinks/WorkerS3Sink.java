@@ -103,8 +103,7 @@ public class WorkerS3Sink extends WorkerSink {
       maybeFlush(true);
     }
     catch (IOException ioe) {
-      _log.error(Joiner.on("\n").join(ioe.getStackTrace()));
-      return;
+      throw new RuntimeException("Sink error!", ioe);
     }
     finally {
       if (_writer != null){

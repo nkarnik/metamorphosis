@@ -33,7 +33,6 @@ public class WorkerS3Sink extends WorkerSink {
 
   private String _shardFull;
   private BufferedWriter _writer;
-  private GZIPOutputStream _zip;
   private JSONObject _sinkObject;
 
   private String _shardPrefix;
@@ -76,11 +75,8 @@ public class WorkerS3Sink extends WorkerSink {
     try{
       _file = new File(gzFileToWrite);
       _file.mkdirs();
-      _file.createNewFile();
-      _log.info("Created File locally: " + _file.getAbsolutePath());
-      
-      _zip = new GZIPOutputStream(new FileOutputStream(_file));
-      _writer = new BufferedWriter(new OutputStreamWriter(_zip, "UTF-8"));
+      _writer = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(gzFileToWrite)), "UTF-8"));
+      _log.info("Created File locally: " + gzFileToWrite);
       while (iterator.hasNext()) {
         MessageAndMetadata<String, String> fetchedMessage = iterator.next();
         String messageBody = fetchedMessage.message();
@@ -116,9 +112,9 @@ public class WorkerS3Sink extends WorkerSink {
           _log.info(e.getStackTrace());
         }
       }
-      if(_file != null && _file.exists()){
-        _file.delete();
-      }
+//      if(_file != null && _file.exists()){
+//        _file.delete();
+//      }
     }
   }
   

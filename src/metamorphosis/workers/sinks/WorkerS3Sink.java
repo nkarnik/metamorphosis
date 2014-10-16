@@ -29,7 +29,6 @@ public class WorkerS3Sink extends WorkerSink {
   private String _bucketName;
   private String _shardPath;
   private int _numMessages;
-  private File _file;
 
   private String _shardFull;
   private BufferedWriter _writer;
@@ -41,6 +40,8 @@ public class WorkerS3Sink extends WorkerSink {
   private int _retryNum;
 
   private int _numMessagesThisShard;
+
+  private String _gzFilePath;
 
   public WorkerS3Sink(JSONObject message) {
     // TODO Auto-generated constructor stub
@@ -69,14 +70,14 @@ public class WorkerS3Sink extends WorkerSink {
     int shardNum = (queueNumber + 1) * 1000 + _retryNum;
     
     _shardFull = _shardPath + _shardPrefix + shardNum + ".gz";
-    String gzFileToWrite = "/tmp/" + _shardFull;
+    _gzFilePath = "/tmp/" + _shardFull;
     
 
     try{
-      _file = new File(gzFileToWrite);
-      _file.mkdirs();
-      _writer = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(gzFileToWrite)), "UTF-8"));
-      _log.info("Created File locally: " + gzFileToWrite);
+      File parentDir = new File("/tmp/" + _shardPath);
+      parentDir.mkdirs();
+      _writer = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(_gzFilePath)), "UTF-8"));
+      _log.info("Created File locally: " + _gzFilePath);
       while (iterator.hasNext()) {
         MessageAndMetadata<String, String> fetchedMessage = iterator.next();
         String messageBody = fetchedMessage.message();
@@ -112,9 +113,10 @@ public class WorkerS3Sink extends WorkerSink {
           _log.info(e.getStackTrace());
         }
       }
-//      if(_file != null && _file.exists()){
-//        _file.delete();
-//      }
+      File gzFile = new File(_gzFilePath);
+      if(gzFile != null && gzFile.exists()){
+        gzFile.delete();
+      }
     }
   }
   
@@ -124,18 +126,22 @@ public class WorkerS3Sink extends WorkerSink {
     _log.debug("Fetched " +_numMessages + " so far...");
     
     if (_numMessages > 0 && (forceFlush || _numMessages > _numMessagesThisShard)) {
+      File gzFile = null;
       try {
         _writer.close();
-        _log.debug("File path is: " + _file.getAbsolutePath() + " with length " + _file.length());
-        S3Util.copyFile(_file, _bucketName, _shardFull);
-        _log.debug("Copied " + _file.getAbsolutePath() + " to " + _shardFull);
+
+        gzFile = new File(_gzFilePath);
+        _log.debug("File path is: " + _gzFilePath + " with length " + gzFile.length());
+        S3Util.copyFile(gzFile, _bucketName, _shardFull);
+        _log.debug("Copied " + _gzFilePath + " to " + _shardFull);
         return true;
       } catch (S3Exception | IOException e) {
         _log.error("Flush failed: ", e);
         return false;
       } finally {
-        _log.debug("Deleting file: " + _file.getAbsolutePath());
-        _file.delete();
+        if(gzFile != null && gzFile.exists())
+          _log.debug("Deleting file: " + _gzFilePath);
+          gzFile.delete();
       }
     }
     return false;

@@ -48,7 +48,7 @@ public class SchlossS3Source extends SchlossSource{
         
         Pair<String, String> decomposedPath = S3Util.decomposePath(line);
         String path = decomposedPath.getValue1();
-        _log.info("Path from decomposed is: " + path);
+        _log.debug("Path from decomposed is: " + path);
      
         //Build JSON to send as message
         JSONBuilder builder = new JSONStringer();

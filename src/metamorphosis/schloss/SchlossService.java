@@ -28,6 +28,7 @@ import metamorphosis.schloss.sinks.SchlossSinkFactory;
 import metamorphosis.schloss.sources.SchlossSource;
 import metamorphosis.schloss.sources.SchlossSourceFactory;
 import metamorphosis.utils.Config;
+import metamorphosis.utils.ExponentialBackoffTicker;
 import metamorphosis.utils.JSONDecoder;
 import metamorphosis.utils.KafkaUtils;
 import metamorphosis.utils.Utils;
@@ -50,7 +51,7 @@ public class SchlossService {
   private Future<String> _sourceReadThread;
   private Future<String> _sinkReadThread;
   //private KafkaService _kafkaService;
-
+  ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(1000);
   
   public SchlossService() {
     
@@ -158,7 +159,7 @@ public class SchlossService {
             JSONObject message = next.message();
             String topic = message.getString("topic");
             
-            _log.debug("Processing message: " + message.toString());
+            _log.info("Processing message: " + message.toString());
             KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
             if(kafkaService.hasTopic(topic)){
               // Do nothing
@@ -166,13 +167,16 @@ public class SchlossService {
               // Create topic with default settings
               kafkaService.createTopic(topic, 20, 1); 
             }
-            SchlossDistributor schlossSource = _factory.createSchlossDistributor(message);
-            List<String> workerQueueMessages = schlossSource.getWorkerMessages();
+            SchlossDistributor schlossHandler = _factory.createSchlossDistributor(message);
+            List<String> workerQueueMessages = schlossHandler.getWorkerMessages();
             distributeMessagesToQueues(_workerQueues, workerQueueMessages);
             
           }
         }catch(ConsumerTimeoutException e){
-          _log.debug("No messages yet on " + _messageQueue + ". Blocking on iterator.hasNext...");
+          if(_ticker.tick()){
+            _log.info("[sampled #" + _ticker.counter() + "] No messages yet on " + _messageQueue + ". ");
+            
+          }
         }
       }
       _log.info("Done with the schloss service loop");

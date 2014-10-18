@@ -3,7 +3,6 @@ package metamorphosis.test;
 import static org.junit.Assert.assertEquals;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
 import metamorphosis.kafka.LocalKafkaService;
@@ -67,6 +66,7 @@ public class MetamorphosisSourceTest {
     Config.singleton().put("schloss.source.queue", SCHLOSS_SOURCE_QUEUE);
     Config.singleton().put("schloss.sink.queue", SCHLOSS_SINK_QUEUE);
     Config.singleton().put("kafka.zookeeper.connect", _localKakfaService.getZKConnectString());
+    Config.singleton().put("gmb.zookeeper.connect", _localKakfaService.getZKConnectString());
     Config.singleton().put("kafka.brokers", Joiner.on(",").join(_localKakfaService.getSeedBrokers()));
     Config.singleton().put("worker.source.queues", Joiner.on(",").join(_workerSourceQueues));
     Config.singleton().put("worker.sink.queues", Joiner.on(",").join(_workerSinkQueues));
@@ -88,8 +88,6 @@ public class MetamorphosisSourceTest {
   
   @Test
   public void testSourceMessage() throws InterruptedException{
-    _workerSourceService.start();
-    _schlossService.startSourceReadThread();
     JSONBuilder builder = new JSONStringer();
     builder.object()
     .key("topic").value(destinationTopic)
@@ -108,6 +106,8 @@ public class MetamorphosisSourceTest {
 
     String message = builder.toString();
     _localKakfaService.sendMessage(SCHLOSS_SOURCE_QUEUE, message);
+    _workerSourceService.start();
+    _schlossService.startSourceReadThread();
     _log.info("Sleeping 10 seconds");
     Thread.sleep(10000);
     _schlossService.stop();
@@ -154,8 +154,8 @@ public class MetamorphosisSourceTest {
     .endObject();
     String sinkMessage = builderSink.toString();
     _localKakfaService.sendMessage(SCHLOSS_SINK_QUEUE, sinkMessage);
-    _log.info("Sleeping 70 seconds ...");
-    Thread.sleep(70000);
+    _log.info("Sleeping 30 seconds ...");
+    Thread.sleep(30000);
     
     _schlossService.stop();
     _workerSinkService.stop();

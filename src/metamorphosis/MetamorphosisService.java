@@ -22,12 +22,12 @@ public class MetamorphosisService {
 
   private static Logger _log = Logger.getLogger(MetamorphosisService.class);
 
-  static String workerSourceQueue = "worker.source.queue";
-  static String workerSinkQueue = "worker.sink.queue";
-  static String schlossSinkQueue = "schloss.sink.queue";
-  static String schlossSourceQueue = "schloss.source.queue";
-  static String workerSinkQueues = "worker.sink.queues";
-  static String workerSourceQueues = "worker.source.queues";
+  public static String workerSourceQueue = "worker.source.queue";
+  public static String workerSinkQueue = "worker.sink.queue";
+  public static String schlossSinkQueue = "schloss.sink.queue";
+  public static String schlossSourceQueue = "schloss.source.queue";
+  public static String workerSinkQueues = "worker.sink.queues";
+  public static String workerSourceQueues = "worker.source.queues";
 
   private static WorkerSourceService _workerSourceService;
 
@@ -164,7 +164,9 @@ public class MetamorphosisService {
     String zkPort = options.getOptionValue("kafka.zookeeper.port", "2181");
     Config.singleton().put("kafka.zookeeper.host", zkHost);
     Config.singleton().put("kafka.zookeeper.port", zkPort);
-    Config.singleton().put("kafka.zookeeper.connect",zkHost + ":" + zkPort + "/kafka");
+    Config.singleton().put("kafka.zookeeper.connect", zkHost + ":" + zkPort + "/kafka");
+    Config.singleton().put("gmb.zookeeper.connect", zkHost + ":" + zkPort + "/gmb");
+
     Config.singleton().put("kafka.consumer.timeout.ms", options.getOptionValue("kafka.consumer.timeout.ms"));
     String service = options.getOptionValue("service");
 

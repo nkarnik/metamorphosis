@@ -94,6 +94,7 @@ public class WorkerSinkServiceTest {
     // create SchlossService
     Config.singleton().put("worker.sink.topic", thisWorkerQueue);
     Config.singleton().put("kafka.zookeeper.connect", _localKakfaService.getZKConnectString());
+    Config.singleton().put("gmb.zookeeper.connect", _localKakfaService.getZKConnectString());
     Config.singleton().put("kafka.brokers", Joiner.on(",").join(_localKakfaService.getSeedBrokers()));
     
     WorkerService<WorkerSink> workerService = new WorkerSinkService(thisWorkerQueue, _localKakfaService);

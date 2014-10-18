@@ -72,6 +72,7 @@ public class SchlossTest {
     Config.singleton().put("schloss.sink.queue", SINK_TOPIC);
     Config.singleton().put("kafka.consumer.timeout.ms", CONSUMER_TIMEOUT_MS);
     Config.singleton().put("kafka.zookeeper.connect", _localKakfaService.getZKConnectString());
+    Config.singleton().put("gmb.zookeeper.connect", _localKakfaService.getZKConnectString());
     Config.singleton().put("kafka.brokers", Joiner.on(",").join(_localKakfaService.getSeedBrokers()));
     Config.singleton().put("worker.source.queues", Joiner.on(",").join(_workerSourceQueues));
     Config.singleton().put("worker.sink.queues", Joiner.on(",").join(_workerSinkQueues));

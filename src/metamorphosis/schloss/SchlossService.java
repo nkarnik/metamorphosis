@@ -141,7 +141,7 @@ public class SchlossService {
       _log.info("Created read thread for queue: " + _messageQueue + " with factory of type: " + _factory);
     } 
     
-    public abstract void distributeMessagesToQueues(String[] _workerQueues, List<String> workerQueueMessages);
+    public abstract void distributeMessagesToQueues(String[] _workerQueues, List<String> workerQueueMessages, String topic);
     
     @Override
     public String call() throws Exception {
@@ -167,7 +167,7 @@ public class SchlossService {
             }
             SchlossDistributor schlossHandler = _factory.createSchlossDistributor(message);
             List<String> workerQueueMessages = schlossHandler.getWorkerMessages();
-            distributeMessagesToQueues(_workerQueues, workerQueueMessages);
+            distributeMessagesToQueues(_workerQueues, workerQueueMessages, topic);
             
           }
         }catch(ConsumerTimeoutException e){
@@ -189,7 +189,7 @@ public class SchlossService {
     super(messageTopic, "worker.source.queues", new SchlossSourceFactory());
   }
   
-  public void distributeMessagesToQueues(String[] workerQueues, List<String> workerQueueMessages) {
+  public void distributeMessagesToQueues(String[] workerQueues, List<String> workerQueueMessages, String topic) {
     // Distribute strategy
     _log.info("Distributing " + workerQueueMessages.size() + " messages to " + workerQueues.length + " brokers.");
     List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
@@ -205,6 +205,12 @@ public class SchlossService {
     Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_brokers), "kafka.producer.DefaultPartitioner");
     Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
     producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
+    // Now that messages are distributed, send a DONE message to all the queues for this topic
+    messages.clear();
+    for( String workerQueue : workerQueues) {
+      messages.add(new KeyedMessage<Integer,String>(workerQueue,"{\"SCHLOSS_DONE\":\"" + topic + "\"}" ));
+    }
+    producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
     producer.close();
     _log.info("Done with distribution.");
     
@@ -219,7 +225,7 @@ public class SchlossService {
   }
 
   @Override
-  public void distributeMessagesToQueues(String[] workerQueues, List<String> workerQueueMessages) {
+  public void distributeMessagesToQueues(String[] workerQueues, List<String> workerQueueMessages, String topic) {
     // Write to all topics.
     _log.info("Schloss Sink distributing " + workerQueueMessages.size() + " messages to " + workerQueues.length + " queues" );
     List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();

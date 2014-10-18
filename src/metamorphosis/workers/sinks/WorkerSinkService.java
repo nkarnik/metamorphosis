@@ -21,6 +21,9 @@ import metamorphosis.utils.KafkaUtils;
 import metamorphosis.workers.WorkerService;
 import net.sf.json.JSONObject;
 
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Joiner;
@@ -42,6 +45,25 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
   protected void processMessage(JSONObject poppedMessage) {
     WorkerSink workerSink = _workerFactory.createWorker(poppedMessage);
     String topic = poppedMessage.getString("topic");
+    
+    //Do we really want to process this message? Look for the done message in zk.
+    String gmbZkConnectString = Config.singleton().getOrException("kafka.zookeeper.connect");
+    try{
+      CuratorFramework client = CuratorFrameworkFactory.newClient(gmbZkConnectString, new ExponentialBackoffRetry(1000, 3));
+      String bufferTopicPath = "/buffer/" + topic + "/status/done";
+      if(client.checkExists().forPath(bufferTopicPath) == null){
+        // Yes, we do want to process it.
+      }else{
+        // Buffer is done being written to.
+        // TODO: Maybe the sinks didn't exhaust them... confirm.
+        return;
+      }
+      
+    }catch(Exception e){
+      _log.error("SinkService crashed when trying to check for zk done message");
+      throw new RuntimeException(e);
+    }
+    
     String clientName = topic;
     ConsumerIterator<String, String> sinkTopicIterator;
     if(_topicToIteratorCache.containsKey(topic)){
@@ -61,6 +83,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       _log.info("Consumer " + clientName + " instantiated");
       _topicToIteratorCache.put(topic,sinkTopicIterator);
     }
+
     workerSink.sink(sinkTopicIterator, _queueNumber);
     
     //streaming sink, so have to increment retry and push back to worker queue

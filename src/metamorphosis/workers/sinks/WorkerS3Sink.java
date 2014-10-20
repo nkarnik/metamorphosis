@@ -54,7 +54,7 @@ public class WorkerS3Sink extends WorkerSink {
     _shardPrefix = config.getString("shard_prefix");
     _topicToRead = message.getString("topic");
     _numMessages = 0;
-    _numMessagesThisShard = _retryNum < 10 ? (_retryNum + 1) * 100 : 1000;
+    _numMessagesThisShard = 1000; // _retryNum < 10 ? (_retryNum + 1) * 100 : 1000;
   }
 
 

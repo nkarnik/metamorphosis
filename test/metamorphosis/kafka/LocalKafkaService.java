@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import kafka.consumer.ConsumerConfig;
 import kafka.consumer.ConsumerIterator;
 import kafka.consumer.ConsumerTimeoutException;
 import kafka.consumer.KafkaStream;
@@ -40,10 +41,11 @@ public class LocalKafkaService extends KafkaService{
   private ArrayList<KafkaServer> _servers;
   private Producer<Integer, String> _producer;
   private static Logger _log = Logger.getLogger(LocalKafkaService.class);
-
+  
   /**
    * Creates a local Kafka service that initializes Zookeeper and sets up brokers
    * @param numBrokers
+   * @throws Exception 
    */
   public LocalKafkaService(int numBrokers) {
 
@@ -52,13 +54,18 @@ public class LocalKafkaService extends KafkaService{
     // setup Zookeeper
     String zkConnect = TestZKUtils.zookeeperConnect();
     _zkServer = new EmbeddedZookeeper(zkConnect);
-
+    ZkClient zkClient = new ZkClient(_zkServer.connectString(), 30000, 30000, ZKStringSerializer$.MODULE$);
+    zkClient.createPersistent("/kafka");
+    zkClient.createPersistent("/gmb");
+    
     // setup Brokers
     _servers = new ArrayList<KafkaServer>();
     for (int i = 0; i < numBrokers; i++) {
       Properties brokerConfig = TestUtils.createBrokerConfig(i, TestUtils.choosePort());
+      brokerConfig.setProperty("zookeeper.connect", _zkServer.connectString() + "/kafka");
       brokerConfig.setProperty("message.max.bytes", "10000000" );
       brokerConfig.setProperty("replica.fetch.max.bytes", "30000000" );
+      _log.info(brokerConfig);
       _servers.add(TestUtils.createServer(new kafka.server.KafkaConfig(brokerConfig), new MockTime()));  
     }
     _log.info("Kafka Service created with " + _servers.size() + " brokers");
@@ -103,8 +110,17 @@ public class LocalKafkaService extends KafkaService{
     return new ZkClient(connectString, 30000, 30000, ZKStringSerializer$.MODULE$);
   }
 
+  @Override 
+  public ZkClient createZKClient(String namespace) {
+    String connectString = getZKConnectString(namespace);
+    return new ZkClient(connectString, 30000, 30000, ZKStringSerializer$.MODULE$);
+  }
 
+  @Override
+  public String getZKConnectString(String namespace) {
 
+    return _zkServer.connectString() + "/" + namespace;    
+  }
   
   /** For mocks only */
   private void initLocalProducer() {
@@ -181,8 +197,10 @@ public class LocalKafkaService extends KafkaService{
   public int readNumMessages(String topic){
     int numMessages = 0;
     
-    String clientName = "temporary_message_reader";
-    ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(KafkaUtils.createConsumerConfig(getZKConnectString(), clientName));
+    String clientName = "temporary_message_reader_" + Math.random() * 100000;
+    Properties props = KafkaUtils.getDefaultProperties(getZKConnectString(), clientName);
+    props.put("consumer.timeout.ms", "500");
+    ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(new ConsumerConfig(props));
 
     Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
     topicCountMap.put(topic, new Integer(1)); // This consumer will only have one thread

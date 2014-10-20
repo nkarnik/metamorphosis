@@ -38,8 +38,8 @@ public abstract class WorkerService<T extends Worker> {
   public String _sourceTopic; //includes queue number
   private Future<Void> _pushThread;
   private Future<Void> _popThread;
-  private ExecutorService _executorPool =  Executors.newFixedThreadPool(10); //(5, 10, 1, TimeUnit.HOURS, new SynchronousQueue<Runnable>());
-  private RoundRobinByTopicMessageQueue _topicMessageQueue = new RoundRobinByTopicMessageQueue();
+  private ExecutorService _executorPool =  Executors.newFixedThreadPool(2); //(5, 10, 1, TimeUnit.HOURS, new SynchronousQueue<Runnable>());
+  private RoundRobinByTopicMessageQueue _topicMessageQueue; 
   protected KafkaService _kafkaService;
   protected WorkerFactory<T> _workerFactory;
   protected int _queueNumber;
@@ -50,8 +50,13 @@ public abstract class WorkerService<T extends Worker> {
     String[] split = _sourceTopic.split("_");
     _queueNumber = Integer.parseInt(split[split.length - 1]);
     _workerFactory = workerFactory;
+    _topicMessageQueue = new RoundRobinByTopicMessageQueue(_sourceTopic);
   }
 
+  public void setRunning(boolean state) {
+    isRunning = new AtomicBoolean(state);
+    
+  }
 
   public void start() {
     isRunning = new AtomicBoolean(true);
@@ -62,13 +67,13 @@ public abstract class WorkerService<T extends Worker> {
   }
   
   
-  public void startRoundRobinPopThread(){
+  public Future<Void> startRoundRobinPopThread(){
     _popThread = Utils.run(new Callable<Void>(){
 
       @Override
       public Void call() throws InterruptedException  {
         _log.info("Entering round robin pop thread");
-        while(isRunning.get()){
+        do{
           //Blocking pop
           try {
             final JSONObject poppedMessage = _topicMessageQueue.pop();
@@ -77,26 +82,34 @@ public abstract class WorkerService<T extends Worker> {
             }
             //Using the executorPool's internal q to send in callables
             _log.debug(this + " is passing to executor: " + poppedMessage.toString());
-            
+            if(_executorPool.isShutdown()){
+              _executorPool =  Executors.newFixedThreadPool(2); 
+            }
             _executorPool.submit(new Callable<String>(){
               @Override
-              public String call() throws Exception {
+              public String call() {
                 _log.debug("Processing message: " + poppedMessage.toString());
-                processMessage(poppedMessage);
+                try{
+                  processMessage(poppedMessage);
+                }catch(Exception e){
+                  _log.error("Process message error!!");
+                  e.printStackTrace();
+                }
                 _log.debug("Completed processing message: " + poppedMessage.toString());
-                
                 return null;
               }
             });
           } catch (TimeoutException e) {
+            
            continue;
           }
-        }
+        }while(isRunning.get());
         _log.info("Exiting round robin pop thread");
 
         return null;
       }
     });
+    return _popThread;
   }
   
   protected abstract void processMessage(final JSONObject poppedMessage);
@@ -110,9 +123,9 @@ public abstract class WorkerService<T extends Worker> {
         _log.info("Entering worker service loop. Waiting on topic: " + _sourceTopic);
         // Create an iterator
         ConsumerIterator<String, JSONObject> iterator = getMessageTopicIterator();
-        while(isRunning.get()){
+        do{
           try{
-            _log.debug("waiting on kafka topic iterator...");
+            //_log.debug("waiting on kafka topic iterator...");
         
             // Blocking wait on source topic
             while(iterator.hasNext()){
@@ -123,7 +136,7 @@ public abstract class WorkerService<T extends Worker> {
           }catch(ConsumerTimeoutException e){
             _log.debug("No messages yet on " + _sourceTopic + ". Blocking on iterator.hasNext...");
           }
-        }
+        }while(isRunning.get());
         _log.info("Done with the shard service loop");
         return null;
       }
@@ -134,7 +147,7 @@ public abstract class WorkerService<T extends Worker> {
 
   private ConsumerIterator<String, JSONObject> getMessageTopicIterator() {
     String clientName = "worker_service_consumer_" + _sourceTopic;
-    Properties props = KafkaUtils.getDefaultProperties(_kafkaService.getZKConnectString(), clientName);
+    Properties props = KafkaUtils.getDefaultProperties(_kafkaService.getZKConnectString("kafka"), clientName);
     String consumerTimeout = Config.singleton().getOrException("kafka.consumer.timeout.ms");
     props.put("consumer.timeout.ms", consumerTimeout);
     ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(new ConsumerConfig(props));
@@ -170,5 +183,9 @@ public abstract class WorkerService<T extends Worker> {
     }
     
   }
-
+  
+  public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException{
+    _executorPool.shutdown();
+    return _executorPool.awaitTermination(timeout, unit);
+  }
 }

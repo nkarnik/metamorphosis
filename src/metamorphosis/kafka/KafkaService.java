@@ -37,18 +37,26 @@ public class KafkaService implements Serializable{
     // Get brokers from start_gmb
     return _seedBrokers;
   }
-
-  protected ZkClient createZKClient() {
-    String connectString = getZKConnectString();
-    return new ZkClient(connectString, 30000, 30000, ZKStringSerializer$.MODULE$);
+  
+  public ZkClient createKafkaZkClient(){
+    return createZKClient("kafka");
+  }
+  
+  public ZkClient createGmbZkClient(){
+    return createZKClient("gmb");
   }
 
-
-  public String getZKConnectString() {
+  protected ZkClient createZKClient(String namespace) {
+    String connectString = getZKConnectString(namespace);
+    return new ZkClient(connectString, 30000, 30000, ZKStringSerializer$.MODULE$);
+  }
+  
+  public String getZKConnectString(String namespace) {
     String zookeeperHost = Config.singleton().getOrException("kafka.zookeeper.host");
     String zookeeperPort = Config.singleton().getOrException("kafka.zookeeper.port");
 
-    return zookeeperHost + ":" + zookeeperPort + "/kafka";
+
+    return zookeeperHost + ":" + zookeeperPort + (namespace == null ? "" : "/" + namespace);    
   }
 
   public int getNumPartitions(String topic) {
@@ -57,7 +65,7 @@ public class KafkaService implements Serializable{
   }
 
   public TopicMetadata getTopicMetadata(String topic) {
-    ZkClient client = createZKClient();
+    ZkClient client = createKafkaZkClient();
     TopicMetadata metadata = AdminUtils.fetchTopicMetadataFromZk(topic, client);
     client.close();
     return metadata;
@@ -103,7 +111,7 @@ public class KafkaService implements Serializable{
   
   public void createTopic(String topic, int partitions, int replicationFactor){
     // create topic
-    ZkClient client = createZKClient();
+    ZkClient client = createKafkaZkClient();
     AdminUtils.createTopic(client, topic, partitions, replicationFactor, new Properties());
     client.close();
     _log.info("Topic created: " + topic + " with " + partitions + " partitions and replication: " + replicationFactor);

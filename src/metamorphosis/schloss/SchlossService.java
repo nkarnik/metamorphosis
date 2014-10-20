@@ -48,8 +48,8 @@ public class SchlossService {
   private String _sourceTopic;
   private String _sinkTopic;
   private String _zkConnectString;
-  private Future<String> _sourceReadThread;
-  private Future<String> _sinkReadThread;
+  private Future<Void> _sourceReadThread;
+  private Future<Void> _sinkReadThread;
   //private KafkaService _kafkaService;
   ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(10);
   
@@ -67,20 +67,23 @@ public class SchlossService {
 
   public void start() {
     // Start while loop
+    isRunning = new AtomicBoolean(true);
     startSourceReadThread();
     startSinkReadThread();
   }
 
 
 
-  public void startSinkReadThread() {
+  public Future<Void> startSinkReadThread() {
     _sinkReadThread = Utils.run(new SchlossSinkReadThread(_sinkTopic));
+    return _sinkReadThread;
   }
 
 
 
-  public void startSourceReadThread() {
+  public Future<Void> startSourceReadThread() {
     _sourceReadThread = Utils.run(new SchlossSourceReadThread(_sourceTopic));
+    return _sourceReadThread;
   }
 
   
@@ -89,7 +92,7 @@ public class SchlossService {
     String clientName = "schloss_service_consumer_" + messageTopic;
     Properties props = KafkaUtils.getDefaultProperties(_zkConnectString, clientName);
     String consumerTimeout = Config.singleton().getOrException("kafka.consumer.timeout.ms");
-    props.put("consumer.timeout.ms", consumerTimeout);
+    props.put("consumer.timeout.ms", "1000");
         
     ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(new ConsumerConfig(props));
 
@@ -105,6 +108,9 @@ public class SchlossService {
     return iterator;
   }
   
+  public void setRunning(boolean state){
+    isRunning = new AtomicBoolean(state);
+  }
   public void stop(){
     _log.info("Shutting down schloss");
     isRunning.set(false);
@@ -127,7 +133,7 @@ public class SchlossService {
   }
 
   
- private abstract class SchlossReadThread<T extends SchlossDistributor> implements Callable<String> {
+ private abstract class SchlossReadThread<T extends SchlossDistributor> implements Callable<Void> {
     
     private String[] _workerQueues;
     private String _messageQueue;
@@ -144,12 +150,12 @@ public class SchlossService {
     public abstract void distributeMessagesToQueues(String[] _workerQueues, List<String> workerQueueMessages, String topic);
     
     @Override
-    public String call() throws Exception {
+    public Void call() throws Exception {
       _log.info("Entering schloss service loop for topic: " + _messageQueue);
-      isRunning = new AtomicBoolean(true);
+      
       // Create an iterator
       ConsumerIterator<String, JSONObject> iterator = getIterator(_messageQueue);
-      while(isRunning.get()){
+      do{
         try{
           // Blocking wait on source topic
           while(iterator.hasNext()){
@@ -171,12 +177,12 @@ public class SchlossService {
             
           }
         }catch(ConsumerTimeoutException e){
-          if(_ticker.tick()){
+//          if(_ticker.tick()){
             _log.info("[sampled #" + _ticker.counter() + "] No messages yet on " + _messageQueue + ". ");
             
-          }
+//          }
         }
-      }
+      }while(isRunning.get());
       _log.info("Done with the schloss service loop");
       return null;
     }
@@ -208,7 +214,7 @@ public class SchlossService {
     // Now that messages are distributed, send a DONE message to all the queues for this topic
     messages.clear();
     for( String workerQueue : workerQueues) {
-      messages.add(new KeyedMessage<Integer,String>(workerQueue,"{\"SCHLOSS_DONE\":\"" + topic + "\"}" ));
+      messages.add(new KeyedMessage<Integer,String>(workerQueue,"{\"topic\":\"" + topic + "\", \"schloss_message\":\"done\"}" ));
     }
     producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
     producer.close();

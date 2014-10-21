@@ -17,6 +17,7 @@ import metamorphosis.workers.sources.WorkerSourceService;
 import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;
 
+import org.I0Itec.zkclient.ZkClient;
 import org.apache.log4j.Logger;
 import org.jets3t.service.S3ServiceException;
 import org.jets3t.service.model.S3Object;
@@ -142,6 +143,11 @@ public class MetamorphosisSourceTest {
     _log.info("");
     assertEquals(100, numMessages);
 
+    ZkClient gmbZkClient = _localKakfaService.createGmbZkClient();
+    gmbZkClient.waitUntilConnected();
+    assertEquals(gmbZkClient.exists("/buffer/" + destinationTopic + "/status/done"), true);
+    
+    
     try {
       _log.info("Deleting temp s3 store");
       S3Util.deletePath("buffer.zillabyte.com", "test/metamorphosis_test/");

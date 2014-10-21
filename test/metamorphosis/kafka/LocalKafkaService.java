@@ -1,5 +1,6 @@
 package metamorphosis.kafka;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -21,10 +22,10 @@ import kafka.utils.TestUtils;
 import kafka.utils.TestZKUtils;
 import kafka.utils.VerifiableProperties;
 import kafka.utils.ZKStringSerializer$;
-import kafka.zk.EmbeddedZookeeper;
 import metamorphosis.utils.KafkaUtils;
 
 import org.I0Itec.zkclient.ZkClient;
+import org.apache.curator.test.TestingServer;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Joiner;
@@ -37,7 +38,7 @@ import com.google.common.collect.Lists;
 public class LocalKafkaService extends KafkaService{
 
   private static final long serialVersionUID = 4341775956497299044L;
-  private EmbeddedZookeeper _zkServer;
+  private TestingServer _zkServer;
   private ArrayList<KafkaServer> _servers;
   private Producer<Integer, String> _producer;
   private static Logger _log = Logger.getLogger(LocalKafkaService.class);
@@ -52,17 +53,22 @@ public class LocalKafkaService extends KafkaService{
     _log.info("Creating Kafka Service");
 
     // setup Zookeeper
-    String zkConnect = TestZKUtils.zookeeperConnect();
-    _zkServer = new EmbeddedZookeeper(zkConnect);
-    ZkClient zkClient = new ZkClient(_zkServer.connectString(), 30000, 30000, ZKStringSerializer$.MODULE$);
+    try {
+      _zkServer = new TestingServer(TestUtils.choosePort());
+    } catch (Exception e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+    ZkClient zkClient = new ZkClient(_zkServer.getConnectString(), 30000, 30000, ZKStringSerializer$.MODULE$);
     zkClient.createPersistent("/kafka");
     zkClient.createPersistent("/gmb");
+    zkClient.close();
     
     // setup Brokers
     _servers = new ArrayList<KafkaServer>();
     for (int i = 0; i < numBrokers; i++) {
       Properties brokerConfig = TestUtils.createBrokerConfig(i, TestUtils.choosePort());
-      brokerConfig.setProperty("zookeeper.connect", _zkServer.connectString() + "/kafka");
+      brokerConfig.setProperty("zookeeper.connect", _zkServer.getConnectString() + "/kafka");
       brokerConfig.setProperty("message.max.bytes", "10000000" );
       brokerConfig.setProperty("replica.fetch.max.bytes", "30000000" );
       _log.info(brokerConfig);
@@ -70,12 +76,12 @@ public class LocalKafkaService extends KafkaService{
     }
     _log.info("Kafka Service created with " + _servers.size() + " brokers");
     _log.info("\tWith config: " + Joiner.on(";").join(getSeedBrokers()));
-    _log.info("Zookeeper for kafka at: " + _zkServer.port());
+    _log.info("Zookeeper for kafka at: " + _zkServer.getPort());
   }
 
   
   public String getZKConnectString() {
-    return _zkServer.connectString();
+    return _zkServer.getConnectString();
   }
 
   /**
@@ -119,7 +125,7 @@ public class LocalKafkaService extends KafkaService{
   @Override
   public String getZKConnectString(String namespace) {
 
-    return _zkServer.connectString() + "/" + namespace;    
+    return _zkServer.getConnectString() + "/" + namespace;    
   }
   
   /** For mocks only */
@@ -135,16 +141,16 @@ public class LocalKafkaService extends KafkaService{
    * For configuration and mock use only. 
    */
   public void sendMessage(String topic, String message) {
-    if(_producer == null) {
-      initLocalProducer();
-    }
+
+    initLocalProducer();
+    
     // send message
     List<KeyedMessage<Integer, String>> messages = new ArrayList<>();
     messages.add(new KeyedMessage<Integer, String>(topic, message));
     _log.info("Sending message to queue " + topic + " with message: " + message);
     try {
     _producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
-    //_producer.close();
+    _producer.close();
     _log.info("Successfully sent message");
     }
     catch (Exception e) {
@@ -170,8 +176,8 @@ public class LocalKafkaService extends KafkaService{
   public List<String> readStringMessagesInTopic(String topic){
     List<String> messages = Lists.newArrayList();
     
-    String clientName = "temporary_message_reader";
-    ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(KafkaUtils.createConsumerConfig(getZKConnectString(), clientName));
+    String clientName = "temporary_message_reader_" + Math.random();
+    ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(KafkaUtils.createConsumerConfig(getZKConnectString("kafka"), clientName));
 
     Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
     topicCountMap.put(topic, new Integer(1)); // This consumer will only have one thread
@@ -189,6 +195,8 @@ public class LocalKafkaService extends KafkaService{
       _log.info("Completed reading from " + topic);
     }catch(Exception e) {
       _log.info("Error is: " + e.getMessage());
+    }finally{
+      _log.info("Done trying to read messages");
     }
     return messages;
   }
@@ -198,7 +206,7 @@ public class LocalKafkaService extends KafkaService{
     int numMessages = 0;
     
     String clientName = "temporary_message_reader_" + Math.random() * 100000;
-    Properties props = KafkaUtils.getDefaultProperties(getZKConnectString(), clientName);
+    Properties props = KafkaUtils.getDefaultProperties(getZKConnectString("kafka"), clientName);
     props.put("consumer.timeout.ms", "500");
     ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(new ConsumerConfig(props));
 
@@ -232,9 +240,14 @@ public class LocalKafkaService extends KafkaService{
     if(_producer != null)
       _producer.close();
 
-    if(_zkServer != null)
-      _zkServer.shutdown();
-
+    if(_zkServer != null){
+      try {
+        _zkServer.stop();
+      } catch (IOException e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
+      }
+    }
     for(KafkaServer server : _servers){
       if(server!= null)
         server.shutdown();

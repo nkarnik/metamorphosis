@@ -92,7 +92,7 @@ public class SchlossService {
     String clientName = "schloss_service_consumer_" + messageTopic;
     Properties props = KafkaUtils.getDefaultProperties(_zkConnectString, clientName);
     String consumerTimeout = Config.singleton().getOrException("kafka.consumer.timeout.ms");
-    props.put("consumer.timeout.ms", "1000");
+    props.put("consumer.timeout.ms", consumerTimeout);
         
     ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(new ConsumerConfig(props));
 

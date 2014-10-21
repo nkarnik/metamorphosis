@@ -57,19 +57,18 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
           _log.debug("Waiting 500ms to acquire lock for status topic: " + bufferTopicPath);
           Utils.sleep(500);
         }
-        client.createPersistent(bufferTopicPath,  "true"); //Lock acquired
+        client.createPersistent(lockPath,  "true"); //Lock acquired
         _log.debug("Lock acquired");
         List<String> workersDone = client.getChildren(bufferTopicPath + "/workers");
         if(workersDone == null || workersDone.size() < numBrokers - 1){
           //Not the last worker to finish. write a worker done
           _log.info("Not last, writing to " + bufferTopicPath + "/workers/" + ourQueue);
           client.createPersistent(bufferTopicPath + "/workers/" + ourQueue, "true");
-        if(workersDone.size() == numBrokers - 1){
+        }else{
             // Last to finish. Write the path that gmb will read
             String zNodePath = bufferTopicPath + "/done"; 
             client.createPersistent(bufferTopicPath + "/done", "true");
             _log.info("Create znode: " + zNodePath);
-          }
         }
         client.delete(lockPath); // Lock released
         _log.debug("Lock released");

@@ -208,10 +208,11 @@ public class KafkaUtils {
     Properties props = new Properties();
     props.put("zookeeper.connect", zookeeper);
     props.put("group.id", groupId);
+    props.put("fetch.min.bytes", "10000");
     props.put("zookeeper.session.timeout.ms", "4000");
     props.put("zookeeper.sync.time.ms", "2000");
     props.put("auto.commit.interval.ms", "10000");
-    props.put("connect.timeout.ms", "1000");
+    props.put("consumer.timeout.ms", "1000");
     props.put("auto.offset.reset", "smallest");
     return props;
   }

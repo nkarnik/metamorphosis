@@ -35,7 +35,7 @@ public class SchlossTest {
     _workerSourceQueues = Lists.newArrayList();
     _workerSinkQueues = Lists.newArrayList();
     _localKakfaService = new LocalKafkaService(NUM_BROKERS);
-    // Create required topics
+    // Create required topicst
     _localKakfaService.createTopic(SOURCE_TOPIC, 1, 1);
     for (int i = 0; i < NUM_BROKERS; i++) {
       _workerSourceQueues.add(PRODUCER_QUEUE_PREFIX + i);
@@ -71,14 +71,17 @@ public class SchlossTest {
     Config.singleton().put("schloss.source.queue", SOURCE_TOPIC);
     Config.singleton().put("schloss.sink.queue", SINK_TOPIC);
     Config.singleton().put("kafka.consumer.timeout.ms", CONSUMER_TIMEOUT_MS);
-    Config.singleton().put("kafka.zookeeper.connect", _localKakfaService.getZKConnectString());
-    Config.singleton().put("gmb.zookeeper.connect", _localKakfaService.getZKConnectString());
+    Config.singleton().put("kafka.zookeeper.connect", _localKakfaService.getZKConnectString() + "/kafka");
+    Config.singleton().put("gmb.zookeeper.connect", _localKakfaService.getZKConnectString() + "/gmb");
     Config.singleton().put("kafka.brokers", Joiner.on(",").join(_localKakfaService.getSeedBrokers()));
     Config.singleton().put("worker.source.queues", Joiner.on(",").join(_workerSourceQueues));
     Config.singleton().put("worker.sink.queues", Joiner.on(",").join(_workerSinkQueues));
     Config.singleton().put("kafka.service", _localKakfaService);
     
     _localKakfaService.sendMessage(SOURCE_TOPIC, message);
+    List<String> readStringMessagesInTopic = _localKakfaService.readStringMessagesInTopic(SOURCE_TOPIC);
+    _log.info("Messages in source_queue now are: " + Joiner.on("\n").join(readStringMessagesInTopic));
+    
     SchlossService schlossService = new SchlossService();
     // run SchlossService
     schlossService.start();
@@ -95,7 +98,7 @@ public class SchlossTest {
     }
     _log.info("Total messages on producer queues: " + receivedMessages.size());
     
-    assertEquals(10, receivedMessages.size());
+    assertEquals(10 + NUM_BROKERS, receivedMessages.size() );
 
   }
 }

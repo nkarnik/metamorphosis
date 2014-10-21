@@ -16,6 +16,10 @@ import metamorphosis.workers.WorkerService;
 import net.sf.json.JSONObject;
 
 import org.I0Itec.zkclient.ZkClient;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.recipes.locks.InterProcessMutex;
+import org.apache.curator.retry.RetryOneTime;
 import org.apache.log4j.Logger;
 import org.javatuples.Pair;
 
@@ -43,34 +47,46 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
         int numBrokers = brokerList.split(",").length;
         String ourQueue = Config.singleton().getOrException(MetamorphosisService.workerSourceQueue);
         KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
-        ZkClient client = kafkaService.createGmbZkClient();
+        
+        CuratorFramework client = CuratorFrameworkFactory.builder()
+                                    //.namespace("gmb")
+                                    .retryPolicy(new RetryOneTime(1000))
+                                    .connectString(kafkaService.getZKConnectString("gmb"))
+                                    .build();
+        client.start();
+        // ZkClient client = kafkaService.createGmbZkClient();
         _log.info("Client connecting ...");
         String bufferTopicPath = "/buffer/" + topic + "/status";
+        String lockPath = bufferTopicPath + "/lock";
+        String workersPath = bufferTopicPath + "/workers";
         
         _log.info("Client started: ");
-        if(!client.exists(bufferTopicPath)){
-          client.createPersistent(bufferTopicPath, true);
-          client.createPersistent(bufferTopicPath + "/workers", true);
+        if(client.checkExists().forPath(bufferTopicPath) == null){
+          _log.info("Creating path: " + bufferTopicPath);
+          client.create().creatingParentsIfNeeded().forPath(bufferTopicPath);
+          client.create().creatingParentsIfNeeded().forPath(workersPath);
+          _log.info("Created path: " + bufferTopicPath);
         }
-        String lockPath = bufferTopicPath + "/lock";
-        while(client.exists(lockPath)){
-          _log.debug("Waiting 500ms to acquire lock for status topic: " + bufferTopicPath);
-          Utils.sleep(500);
-        }
-        client.createPersistent(lockPath,  "true"); //Lock acquired
-        _log.debug("Lock acquired");
-        List<String> workersDone = client.getChildren(bufferTopicPath + "/workers");
-        if(workersDone == null || workersDone.size() < numBrokers - 1){
-          //Not the last worker to finish. write a worker done
-          _log.info("Not last, writing to " + bufferTopicPath + "/workers/" + ourQueue);
-          client.createPersistent(bufferTopicPath + "/workers/" + ourQueue, "true");
-        }else{
+        
+        InterProcessMutex mutex = new InterProcessMutex(client, lockPath);
+
+        if(mutex.acquire(5,TimeUnit.SECONDS)){
+          _log.debug("Lock acquired");
+          
+          List<String> workersDone = client.getChildren().forPath(workersPath);
+          if(workersDone == null || workersDone.size() < numBrokers - 1){
+            //Not the last worker to finish. write a worker done
+            _log.info("Not last, writing to " + bufferTopicPath + "/workers/" + ourQueue);
+            client.create().creatingParentsIfNeeded().forPath(bufferTopicPath + "/workers/" + ourQueue);
+            
+          }else{
             // Last to finish. Write the path that gmb will read
             String zNodePath = bufferTopicPath + "/done"; 
-            client.createPersistent(bufferTopicPath + "/done", "true");
+            client.create().creatingParentsIfNeeded().forPath(zNodePath);
             _log.info("Create znode: " + zNodePath);
+          }
         }
-        client.delete(lockPath); // Lock released
+        mutex.release();
         _log.debug("Lock released");
       } catch (Exception e) {
         _log.error("Couldn't process schloss_message");

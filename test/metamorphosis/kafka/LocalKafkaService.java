@@ -60,6 +60,7 @@ public class LocalKafkaService extends KafkaService{
       e.printStackTrace();
     }
     ZkClient zkClient = new ZkClient(_zkServer.getConnectString(), 30000, 30000, ZKStringSerializer$.MODULE$);
+    zkClient.waitUntilConnected();
     zkClient.createPersistent("/kafka");
     zkClient.createPersistent("/gmb");
     zkClient.close();

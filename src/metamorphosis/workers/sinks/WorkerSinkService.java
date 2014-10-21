@@ -52,17 +52,14 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
     try{
       String bufferTopicPath = "/buffer/" + topic + "/status/done";
       
-      if(client.exists(bufferTopicPath)){
+      if(!client.exists(bufferTopicPath)){
         // Yes, we do want to process it.
-        _log.debug("No done path found. Processing message: " + poppedMessage);
+        _log.debug("Done path (" + bufferTopicPath+ ") not found. Processing message: " + poppedMessage);
       }else{
         // Buffer is done being written to.
         // TODO: Maybe the sinks didn't exhaust them... confirm.
-        _log.debug("Done path found. Stopping sinks." + poppedMessage);
+        _log.debug("Done path (" + bufferTopicPath+ ") found. Stopping sinks." + poppedMessage);
         done = true;
-        if(!_topicToIteratorCache.containsKey(topic)){
-          _log.error("!! No topic iterator for done message! We don't have config to deal with last run.");
-        }
       }
       
     }catch(Exception e){

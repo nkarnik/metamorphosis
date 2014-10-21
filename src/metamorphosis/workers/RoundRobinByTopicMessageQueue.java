@@ -47,14 +47,13 @@ public class RoundRobinByTopicMessageQueue {
       _topics.add(topic);
       queue = new ConcurrentLinkedQueue<JSONObject>();
       _queues.put(topic, queue);
-      _log.info(_queueId + ":: adding new topic to queues: " + topic);
+      _log.debug(_queueId + ":: adding new topic to queues: " + topic);
 
     }else{
       queue = _queues.get(topic);
     }
     queue.add(message);    
     _remainingMessages += 1;
-    _log.info("pushed Message: " + message);
     if(_popTicker.tick()){
       _log.info(_queueId + ":: [sampled #" + _popTicker.counter() + "] Pushed message into round robin. Current remaining messages: " + _remainingMessages);
       

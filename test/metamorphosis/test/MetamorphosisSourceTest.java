@@ -147,7 +147,6 @@ public class MetamorphosisSourceTest {
     gmbZkClient.waitUntilConnected();
     assertEquals(gmbZkClient.exists("/buffer/" + destinationTopic + "/status/done"), true);
     
-    
     try {
       _log.info("Deleting temp s3 store");
       S3Util.deletePath("buffer.zillabyte.com", "test/metamorphosis_test/");

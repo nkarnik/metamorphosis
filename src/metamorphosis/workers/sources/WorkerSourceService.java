@@ -55,17 +55,17 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
                                     .build();
         client.start();
         // ZkClient client = kafkaService.createGmbZkClient();
-        _log.info("Client connecting ...");
+        _log.debug("Client connecting ...");
         String bufferTopicPath = "/buffer/" + topic + "/status";
         String lockPath = bufferTopicPath + "/lock";
         String workersPath = bufferTopicPath + "/workers";
         
-        _log.info("Client started: ");
+        _log.debug("Client started: ");
         if(client.checkExists().forPath(bufferTopicPath) == null){
-          _log.info("Creating path: " + bufferTopicPath);
+          _log.debug("Creating path: " + bufferTopicPath);
           client.create().creatingParentsIfNeeded().forPath(bufferTopicPath);
           client.create().creatingParentsIfNeeded().forPath(workersPath);
-          _log.info("Created path: " + bufferTopicPath);
+          _log.debug("Created path: " + bufferTopicPath);
         }
         
         InterProcessMutex mutex = new InterProcessMutex(client, lockPath);

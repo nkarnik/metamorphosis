@@ -1,0 +1,3 @@
+#!/bin/bash
+cd ~/zb1/metamorphosis
+./start_service worker

@@ -39,7 +39,7 @@ public abstract class WorkerService<T extends Worker> {
   public String _sourceTopic; //includes queue number
   private Future<Void> _pushThread;
   private Future<Void> _popThread;
-  private ExecutorService _executorPool =  Executors.newFixedThreadPool(2); //(5, 10, 1, TimeUnit.HOURS, new SynchronousQueue<Runnable>());
+  private ExecutorService _executorPool =  Executors.newFixedThreadPool(10); //(5, 10, 1, TimeUnit.HOURS, new SynchronousQueue<Runnable>());
   private RoundRobinByTopicMessageQueue _topicMessageQueue; 
   protected KafkaService _kafkaService;
   protected WorkerFactory<T> _workerFactory;

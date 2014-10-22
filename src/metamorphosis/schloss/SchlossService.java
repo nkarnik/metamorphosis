@@ -177,10 +177,9 @@ public class SchlossService {
             
           }
         }catch(ConsumerTimeoutException e){
-//          if(_ticker.tick()){
-            _log.info("[sampled #" + _ticker.counter() + "] No messages yet on " + _messageQueue + ". ");
-            
-//          }
+          if(_ticker.tick()){
+            _log.info("[sampled #" + _ticker.counter() + "] No messages yet on " + _messageQueue + ". "); 
+          }
         }
       }while(isRunning.get());
       _log.info("Done with the schloss service loop");

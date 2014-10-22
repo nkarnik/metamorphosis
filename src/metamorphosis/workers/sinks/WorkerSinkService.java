@@ -58,7 +58,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       }else{
         // Buffer is done being written to.
         // TODO: Maybe the sinks didn't exhaust them... confirm.
-        _log.info("Done path (" + bufferTopicPath+ ") found. Stopping sinks.");
+        _log.info("Done path (" + bufferTopicPath+ ") found. Stopping sinks. Running one more time to catch tuples we might not have.");
         done = true;
       }
       

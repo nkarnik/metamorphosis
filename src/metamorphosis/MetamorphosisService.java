@@ -8,6 +8,7 @@ import metamorphosis.kafka.KafkaService;
 import metamorphosis.schloss.SchlossService;
 import metamorphosis.utils.CommandLine;
 import metamorphosis.utils.Config;
+import metamorphosis.utils.Utils;
 import metamorphosis.workers.sinks.WorkerSinkService;
 import metamorphosis.workers.sources.WorkerSourceService;
 
@@ -233,15 +234,23 @@ public class MetamorphosisService {
     _workerSinkService = new WorkerSinkService((String)Config.singleton().getOrException(workerSinkQueue), kafkaService);
     _workerSourceService.start();
     _workerSinkService.start();
+    readInput();
+    
+  }
+
+  private static void readInput() {
     while(true){
       String input = getInput();
       if(input != null && input.equals("q")){
         cleanup();
+        System.exit(1);
       }else{
-        _log.info("Received input: " + input);
+        if(input != null){
+          _log.info("Received input: " + input);
+        }
       }
+      Utils.sleep(3000);
     }
-    
   }
 
   public static void cleanup() {
@@ -259,21 +268,12 @@ public class MetamorphosisService {
     _log.info("Starting Schloss service");
     _schlossService = new  SchlossService();
     _schlossService.start();
-    while(true){
-      String input = getInput();
-      if(input != null && input.equals("q")){
-        cleanup();
-        System.exit(1);
-      }else{
-        _log.info("Received input: " + input);
-      }
-    }
+    readInput();
   }
 
   private static String getInput() {
-    BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-    
     try {
+      BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
       String input = null;
       do{
         System.out.print("> ");

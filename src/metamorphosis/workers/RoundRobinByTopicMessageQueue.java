@@ -54,8 +54,8 @@ public class RoundRobinByTopicMessageQueue {
     }
     queue.add(message);    
     _remainingMessages += 1;
-    if(_popTicker.tick()){
-      _log.info(_queueId + ":: [sampled #" + _popTicker.counter() + "] Pushed message into round robin. Current remaining messages: " + _remainingMessages);
+    if(_pushTicker.tick()){
+      _log.info(_queueId + ":: [sampled #" + _pushTicker.counter() + "] Pushed message into round robin. Current remaining messages: " + _remainingMessages);
       
     }
   }
@@ -94,8 +94,8 @@ public class RoundRobinByTopicMessageQueue {
       
     } while (popped == null && !_interrupted.get() );
     _remainingMessages -= 1;
-    if(_pushTicker.tick()){
-      _log.info(_queueId + ":: [sampled #" + _pushTicker.counter() + "] Popped message from round robin. Current remaining messages: " + _remainingMessages);
+    if(_popTicker.tick()){
+      _log.info(_queueId + ":: [sampled #" + _popTicker.counter() + "] Popped message from round robin. Current remaining messages: " + _remainingMessages);
     }
 
     return popped;

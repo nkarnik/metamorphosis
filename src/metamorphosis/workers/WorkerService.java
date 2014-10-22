@@ -22,6 +22,7 @@ import kafka.serializer.StringDecoder;
 import kafka.utils.VerifiableProperties;
 import metamorphosis.kafka.KafkaService;
 import metamorphosis.utils.Config;
+import metamorphosis.utils.ExponentialBackoffTicker;
 import metamorphosis.utils.JSONDecoder;
 import metamorphosis.utils.KafkaUtils;
 import metamorphosis.utils.Utils;
@@ -43,7 +44,8 @@ public abstract class WorkerService<T extends Worker> {
   protected KafkaService _kafkaService;
   protected WorkerFactory<T> _workerFactory;
   protected int _queueNumber;
-
+  private ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(100);
+  
   public WorkerService(String sourceTopic, KafkaService kafkaService, WorkerFactory<T> workerFactory) {
     _kafkaService = kafkaService;
     _sourceTopic = sourceTopic;

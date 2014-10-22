@@ -58,7 +58,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       }else{
         // Buffer is done being written to.
         // TODO: Maybe the sinks didn't exhaust them... confirm.
-        _log.debug("Done path (" + bufferTopicPath+ ") found. Stopping sinks." + poppedMessage);
+        _log.info("Done path (" + bufferTopicPath+ ") found. Stopping sinks." + poppedMessage);
         done = true;
       }
       
@@ -77,7 +77,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       Properties props = KafkaUtils.getDefaultProperties(_kafkaService.getZKConnectString("kafka"), clientName);
       props.put("consumer.timeout.ms", Config.singleton().getOrException("kafka.consumer.timeout.ms"));
       _consumer = kafka.consumer.Consumer.createJavaConsumerConnector(new ConsumerConfig(props));
-      _log.info("New consumer created: " + _consumer.hashCode());
+      _log.debug("New consumer created: " + _consumer.hashCode());
       
       Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
       topicCountMap.put(topic, new Integer(1)); // This consumer will only have one thread
@@ -100,9 +100,9 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_kafkaService.getSeedBrokers()), "kafka.producer.DefaultPartitioner");
       Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
       producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
-      if(_ticker.tick()){
-        _log.info("[sampled #" + _ticker.counter() + "] Sending message: " + poppedMessage.toString() + " to topic: " + _sourceTopic);
-      }
+    
+      _log.info("Retrying sink. Sending message: " + poppedMessage.toString() + " to topic: " + _sourceTopic);
+      
       producer.close(); 
       
     }

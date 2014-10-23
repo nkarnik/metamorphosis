@@ -21,7 +21,9 @@ import metamorphosis.utils.KafkaUtils;
 import metamorphosis.workers.WorkerService;
 import net.sf.json.JSONObject;
 
-import org.I0Itec.zkclient.ZkClient;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Joiner;
@@ -47,12 +49,19 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
     //Do we really want to process this message? Look for the done message in zk.
     _log.debug("Performing zk check...");
     KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
-    ZkClient client = kafkaService.createGmbZkClient();
     
     try{
+      
+      CuratorFramework client = CuratorFrameworkFactory.builder()
+          //.namespace("gmb")
+          .retryPolicy(new ExponentialBackoffRetry(1000, 5))
+          .connectString(kafkaService.getZKConnectString("gmb"))
+          .build();
+      client.start();
+      
       String bufferTopicPath = "/buffer/" + topic + "/status/done";
       
-      if(!client.exists(bufferTopicPath)){
+      if(client.checkExists().forPath(bufferTopicPath) == null){
         // Yes, we do want to process it.
         _log.debug("Done path (" + bufferTopicPath+ ") not found. Processing message: " + poppedMessage);
       }else{
@@ -61,7 +70,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
         _log.info("Done path (" + bufferTopicPath+ ") found. Stopping sinks. Running one more time to catch tuples we might not have.");
         done = true;
       }
-      
+      client.close();
     }catch(Exception e){
       _log.error("SinkService crashed when trying to check for zk done message");
       e.printStackTrace();

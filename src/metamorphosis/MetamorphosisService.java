@@ -8,6 +8,7 @@ import metamorphosis.kafka.KafkaService;
 import metamorphosis.schloss.SchlossService;
 import metamorphosis.utils.CommandLine;
 import metamorphosis.utils.Config;
+import metamorphosis.utils.Utils;
 import metamorphosis.workers.sinks.WorkerSinkService;
 import metamorphosis.workers.sources.WorkerSourceService;
 
@@ -22,13 +23,34 @@ public class MetamorphosisService {
 
   private static Logger _log = Logger.getLogger(MetamorphosisService.class);
 
-  static String workerSourceQueue = "worker.source.queue";
-  static String workerSinkQueue = "worker.sink.queue";
-  static String schlossSinkQueue = "schloss.sink.queue";
-  static String schlossSourceQueue = "schloss.source.queue";
-  static String workerSinkQueues = "worker.sink.queues";
-  static String workerSourceQueues = "worker.source.queues";
+  public static String workerSourceQueue = "worker.source.queue";
+  public static String workerSinkQueue = "worker.sink.queue";
+  public static String schlossSinkQueue = "schloss.sink.queue";
+  public static String schlossSourceQueue = "schloss.source.queue";
+  public static String workerSinkQueues = "worker.sink.queues";
+  public static String workerSourceQueues = "worker.source.queues";
 
+  private static WorkerSourceService _workerSourceService;
+
+  private static WorkerSinkService _workerSinkService;
+
+  private static SchlossService _schlossService;
+  /***
+   * 
+   */
+  public static void addCleanupShutdownHooks() {
+    Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          cleanup();
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+      }      
+    }));
+  }
+  
   @SuppressWarnings("static-access")
   public static void main(String[] args) throws ParseException {
     
@@ -143,7 +165,9 @@ public class MetamorphosisService {
     String zkPort = options.getOptionValue("kafka.zookeeper.port", "2181");
     Config.singleton().put("kafka.zookeeper.host", zkHost);
     Config.singleton().put("kafka.zookeeper.port", zkPort);
-    Config.singleton().put("kafka.zookeeper.connect",zkHost + ":" + zkPort + "/kafka");
+    Config.singleton().put("kafka.zookeeper.connect", zkHost + ":" + zkPort + "/kafka");
+    Config.singleton().put("gmb.zookeeper.connect", zkHost + ":" + zkPort + "/gmb");
+
     Config.singleton().put("kafka.consumer.timeout.ms", options.getOptionValue("kafka.consumer.timeout.ms"));
     String service = options.getOptionValue("service");
 
@@ -206,42 +230,50 @@ public class MetamorphosisService {
 
   private static void startWorkerService(KafkaService kafkaService) {
     _log.info("Starting worker services");
-    WorkerSourceService sourceService = new WorkerSourceService((String)Config.singleton().getOrException(workerSourceQueue), kafkaService);
-    WorkerSinkService sinkService = new WorkerSinkService((String)Config.singleton().getOrException(workerSinkQueue), kafkaService);
-    sourceService.start();
-    sinkService.start();
+    _workerSourceService = new WorkerSourceService((String)Config.singleton().getOrException(workerSourceQueue), kafkaService);
+    _workerSinkService = new WorkerSinkService((String)Config.singleton().getOrException(workerSinkQueue), kafkaService);
+    _workerSourceService.start();
+    _workerSinkService.start();
+    readInput();
+    
+  }
+
+  private static void readInput() {
     while(true){
       String input = getInput();
       if(input != null && input.equals("q")){
-        sourceService.stop();
-        sinkService.stop();
+        cleanup();
         System.exit(1);
       }else{
-        _log.info("Received input: " + input);
+        if(input != null){
+          _log.info("Received input: " + input);
+        }
       }
+      Utils.sleep(3000);
     }
-    
+  }
+
+  public static void cleanup() {
+    _log.info("Cleaning up for shutdown.");
+    if(_workerSourceService != null)
+      _workerSourceService.stop();  
+    if(_workerSinkService != null)
+      _workerSinkService.stop();
+    if(_schlossService != null)
+      _schlossService.stop();
+    System.exit(1);
   }
 
   private static void startSchlossService() {
     _log.info("Starting Schloss service");
-    SchlossService schlossService = new  SchlossService();
-    schlossService.start();
-    while(true){
-      String input = getInput();
-      if(input != null && input.equals("q")){
-        schlossService.stop();
-        System.exit(1);
-      }else{
-        _log.info("Received input: " + input);
-      }
-    }
+    _schlossService = new  SchlossService();
+    _schlossService.start();
+    readInput();
   }
 
   private static String getInput() {
-    BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-    
     try {
+      BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
       String input = null;
       do{
         System.out.print("> ");

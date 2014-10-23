@@ -296,6 +296,12 @@ public class S3Util {
     org.apache.commons.io.FileUtils.deleteDirectory(new File(dirPath));
   }
   
+  public static void recursiveDeletePath(String bucket, String key) throws S3ServiceException, S3Exception{
+    for(S3Object o : S3Util.listPath(bucket, key)){
+      S3Util.deleteFile(o);
+    }
+  }
+  
   public static Pair<File,InputStream> getS3ObjInputStreamCached(String bucket, String key, String directory) throws InterruptedException, S3Exception {
     
     // Init 

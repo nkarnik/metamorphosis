@@ -7,7 +7,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import kafka.message.MessageAndMetadata;
-import metamorphosis.utils.BackoffTicker;
 import metamorphosis.utils.ExponentialBackoffTicker;
 import metamorphosis.utils.Utils;
 import net.sf.json.JSONObject;
@@ -24,7 +23,11 @@ public class RoundRobinByTopicMessageQueue {
   private AtomicBoolean _interrupted;
   private ExponentialBackoffTicker _pushTicker = new ExponentialBackoffTicker(100);
   private ExponentialBackoffTicker _popTicker = new ExponentialBackoffTicker(100);
-  public RoundRobinByTopicMessageQueue() {
+  private String _queueId;
+  
+  
+  public RoundRobinByTopicMessageQueue(String queueId) {
+    _queueId = queueId;
     
     _queues = new HashMap<String, ConcurrentLinkedQueue<JSONObject>>();
     _queueNum = 0;
@@ -44,15 +47,15 @@ public class RoundRobinByTopicMessageQueue {
       _topics.add(topic);
       queue = new ConcurrentLinkedQueue<JSONObject>();
       _queues.put(topic, queue);
-      _log.info("adding new topic to queues: " + topic + " q: " + queue);
+      _log.debug(_queueId + ":: adding new topic to queues: " + topic);
 
     }else{
       queue = _queues.get(topic);
     }
     queue.add(message);    
     _remainingMessages += 1;
-    if(_popTicker.tick()){
-      _log.info("[sampled #" + _popTicker.counter() + "] Pushed message into round robin. Current remaining messages: " + _remainingMessages);
+    if(_pushTicker.tick()){
+      _log.info(_queueId + ":: [sampled #" + _pushTicker.counter() + "] Pushed message into round robin. Current remaining messages: " + _remainingMessages);
       
     }
   }
@@ -69,7 +72,7 @@ public class RoundRobinByTopicMessageQueue {
     do {
   
       if(_topics.size() == 0){
-        _log.debug("No topics in the round robin, waiting...");
+        _log.debug(_queueId + ":: No topics in the round robin, waiting...");
         Utils.sleep(1000);
         continue;
       }
@@ -84,15 +87,15 @@ public class RoundRobinByTopicMessageQueue {
       topicsSeen++;
       
       if(topicsSeen == size){
-        _log.debug("No messages in the round robin, waiting...");
+        _log.debug(_queueId + ":: No messages in the round robin, waiting...");
         topicsSeen = 0;
         Utils.sleep(1000);
       }
       
     } while (popped == null && !_interrupted.get() );
     _remainingMessages -= 1;
-    if(_pushTicker.tick()){
-      _log.info("[sampled #" + _pushTicker.counter() + "] Popped message from round robin. Current remaining messages: " + _remainingMessages);
+    if(_popTicker.tick()){
+      _log.info(_queueId + ":: [sampled #" + _popTicker.counter() + "] Popped message from round robin. Current remaining messages: " + _remainingMessages);
     }
 
     return popped;

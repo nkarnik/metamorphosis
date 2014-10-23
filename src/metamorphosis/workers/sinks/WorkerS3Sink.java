@@ -10,6 +10,7 @@ import java.util.zip.GZIPOutputStream;
 import kafka.consumer.ConsumerIterator;
 import kafka.consumer.ConsumerTimeoutException;
 import kafka.message.MessageAndMetadata;
+import metamorphosis.utils.ExponentialBackoffTicker;
 import metamorphosis.utils.KafkaUtils;
 import metamorphosis.utils.s3.S3Exception;
 import metamorphosis.utils.s3.S3Util;
@@ -27,27 +28,33 @@ public class WorkerS3Sink extends WorkerSink {
   private String _topicToRead;
   private String _bucketName;
   private String _shardPath;
-  private int _bytesFetched;
-  private File _file;
+  private int _numMessages;
 
   private String _shardFull;
   private BufferedWriter _writer;
-  private GZIPOutputStream _zip;
   private JSONObject _sinkObject;
 
   private String _shardPrefix;
-  private static long MIN_SHARD_SIZE = 50 * 1000 * 1000;
+  ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(1000);
+
+  private int _retryNum;
+
+  private int _numMessagesThisShard;
+
+  private String _gzFilePath;
 
   public WorkerS3Sink(JSONObject message) {
     // TODO Auto-generated constructor stub
     _message = message;
     _sinkObject = _message.getJSONObject("sink");
+    _retryNum = _sinkObject.getInt("retry");
     JSONObject config = _sinkObject.getJSONObject("config");
     _bucketName = config.getString("bucket");
     _shardPath = config.getString("shard_path");
     _shardPrefix = config.getString("shard_prefix");
     _topicToRead = message.getString("topic");
-    _bytesFetched = 0;
+    _numMessages = 0;
+    _numMessagesThisShard = 1000; // _retryNum < 10 ? (_retryNum + 1) * 100 : 1000;
   }
 
 
@@ -60,39 +67,42 @@ public class WorkerS3Sink extends WorkerSink {
   @Override
   public void sink(ConsumerIterator<String, String> iterator, int queueNumber) {
     
-    int shardNum = queueNumber * 1000 + _sinkObject.getInt("retry");
-    _shardFull = _shardPath + _shardPrefix + shardNum + ".gz";
-    String gzFileToWrite = "/tmp/" + _shardPrefix + shardNum + ".gz";
-
-    try {
-      _file = new File(gzFileToWrite);
-      _log.debug("Created File locally: " + gzFileToWrite);
+    int shardNum = (queueNumber + 1) * 1000 + _retryNum;
     
-      _zip = new GZIPOutputStream(new FileOutputStream(_file));
-      _writer = new BufferedWriter(new OutputStreamWriter(_zip, "UTF-8"));
-      try{
-        while (iterator.hasNext()) {
-          MessageAndMetadata<String, String> fetchedMessage = iterator.next();
-          String messageBody = fetchedMessage.message();
-          int messageSize = messageBody.getBytes("UTF-8").length;
-          _bytesFetched += messageSize;
-          _writer.append(messageBody);
-          _writer.newLine();
-          _writer.flush();
-          if (maybeFlush(false)) {
-            _log.info("Consumer ("+ iterator.clientId() + ") Retreived message offset to sink from topic " + _topicToRead + " is " + fetchedMessage.offset());
-            _log.info("Flushed shard to S3: " + _shardFull);
-            _writer.close();
-            return;
-          }
+    _shardFull = _shardPath + _shardPrefix + shardNum + ".gz";
+    _gzFilePath = "/tmp/" + _shardFull;
+    
+
+    try{
+      File parentDir = new File("/tmp/" + _shardPath);
+      parentDir.mkdirs();
+      _writer = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(_gzFilePath)), "UTF-8"));
+      _log.info("Created File locally: " + _gzFilePath);
+      while (iterator.hasNext()) {
+        MessageAndMetadata<String, String> fetchedMessage = iterator.next();
+        String messageBody = fetchedMessage.message();
+        _numMessages += 1;
+        _writer.append(messageBody);
+        _writer.newLine();
+        _writer.flush();
+        if (maybeFlush(false)) {
+          _log.info("Consumer ("+ iterator.clientId() + ") Retreived message offset to sink from topic " + _topicToRead + " is " + fetchedMessage.offset());
+          _log.info("Flushed shard to S3: " + _shardFull);
+          _writer.close();
+          return;
         }
-      }catch(ConsumerTimeoutException e){
-        _log.info("Consumer timed out, flushing for sure");
-        maybeFlush(true);
       }
+    }catch(ConsumerTimeoutException e){
+      if(_ticker.tick()){
+        _log.info("[sampled #" + _ticker.counter() + "] Consumer timed out. maybe flush " + _numMessages + " messages");  
+      }
+      
+      maybeFlush(true);
     }
     catch (IOException ioe) {
-      _log.error(Joiner.on("\n").join(ioe.getStackTrace()));
+      _log.error("Sink Error !!!");
+      _log.error(ioe.getMessage());
+      _log.error(Joiner.on("\n\t").join(ioe.getStackTrace()));
       return;
     }
     finally {
@@ -103,8 +113,9 @@ public class WorkerS3Sink extends WorkerSink {
           _log.info(e.getStackTrace());
         }
       }
-      if(_file != null && _file.exists()){
-        _file.delete();
+      File gzFile = new File(_gzFilePath);
+      if(gzFile != null && gzFile.exists()){
+        gzFile.delete();
       }
     }
   }
@@ -112,20 +123,25 @@ public class WorkerS3Sink extends WorkerSink {
 
   
   protected boolean maybeFlush(boolean forceFlush) {
-    _log.debug("Fetched " +_bytesFetched + " so far...");
-    if (_bytesFetched > 0 && (forceFlush || _bytesFetched > MIN_SHARD_SIZE)) {
+    _log.debug("Fetched " +_numMessages + " so far...");
+    
+    if (_numMessages > 0 && (forceFlush || _numMessages > _numMessagesThisShard)) {
+      File gzFile = null;
       try {
         _writer.close();
-        _log.debug("File path is: " + _file.getAbsolutePath() + " with length " + _file.length());
-        S3Util.copyFile(_file, _bucketName, _shardFull);
-        _log.debug("Copied " + _file.getAbsolutePath() + " to " + _shardFull);
+
+        gzFile = new File(_gzFilePath);
+        _log.debug("File path is: " + _gzFilePath + " with length " + gzFile.length());
+        S3Util.copyFile(gzFile, _bucketName, _shardFull);
+        _log.debug("Copied " + _gzFilePath + " to " + _shardFull);
         return true;
       } catch (S3Exception | IOException e) {
         _log.error("Flush failed: ", e);
         return false;
       } finally {
-        _log.debug("Deleting file: " + _file.getAbsolutePath());
-        _file.delete();
+        if(gzFile != null && gzFile.exists())
+          _log.debug("Deleting file: " + _gzFilePath);
+          gzFile.delete();
       }
     }
     return false;

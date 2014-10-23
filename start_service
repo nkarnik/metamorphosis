@@ -35,10 +35,10 @@ opt_parser = OptionParser.new(:unknown_options_action => :collect) do |opt|
 end
 
 opt_parser.parse!
-env = ARGV.shift
 service = ARGV.shift
 hostname = `hostname`.chomp + ".ec2.internal"
 puts "hostname is #{hostname}"
+env = `grep "^node_name " /etc/chef/client.rb`.split(" ").last.gsub('"',"").split(".").first
 
 kafka_brokers = find_nodes(env, "kafka_broker")
 puts "List of brokers found: #{kafka_brokers.join(',')}"
@@ -77,7 +77,7 @@ else
   puts "Unsupported service: #{service}"
   exit
 end
-kafka_consumer_timeout = "60000"
+kafka_consumer_timeout = "20000"
 
 #To allow debugging from eclipse while running on vagrant/test/prod. add at the start of -Dexec.args="
 jvm_debug=""

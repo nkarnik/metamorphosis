@@ -39,7 +39,6 @@ public class WorkerS3Source extends WorkerSource {
 
   @Override
   public Pair<File, Iterable<String>> getMessageIterator() {
-    
     try {
       Pair<File, BufferedReader> cachedGzipFileReaderPair = S3Util.getCachedGzipFileReader(_bucketName, _shardPath);
       _bufferedShardReader = cachedGzipFileReaderPair.getValue1();

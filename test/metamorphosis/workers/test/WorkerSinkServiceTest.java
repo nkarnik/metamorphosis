@@ -1,19 +1,27 @@
 package metamorphosis.workers.test;
 
+import static org.junit.Assert.assertEquals;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import metamorphosis.kafka.LocalKafkaService;
 import metamorphosis.utils.Config;
+import metamorphosis.utils.s3.S3Exception;
+import metamorphosis.utils.s3.S3Util;
 import metamorphosis.workers.WorkerService;
 import metamorphosis.workers.sinks.WorkerSink;
+import metamorphosis.workers.sinks.WorkerSinkFactory;
 import metamorphosis.workers.sinks.WorkerSinkService;
 import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;
 
-import org.apache.commons.lang.NotImplementedException;
 import org.apache.log4j.Logger;
+import org.jets3t.service.S3ServiceException;
+import org.jets3t.service.model.S3Object;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -53,20 +61,34 @@ public class WorkerSinkServiceTest {
       }
       _localKakfaService.sendMessageBatch(TOPIC_TO_SINK, messages);
     }
+    
+    Config.singleton().put("kafka.service", _localKakfaService);
+    Config.singleton().put("kafka.consumer.timeout.ms", "1000");
+    Config.singleton().put("kafka.zookeeper.connect", _localKakfaService.getZKConnectString());
+    Config.singleton().put("gmb.zookeeper.connect", _localKakfaService.getZKConnectString());
+    Config.singleton().put("kafka.brokers", Joiner.on(",").join(_localKakfaService.getSeedBrokers()));
+
     _log.info("Test data added");
   }
 
   @Test
-  public void testSingleWorkerS3Sink() throws InterruptedException, ExecutionException{
+  public void testSingleWorkerS3Sink() throws InterruptedException, ExecutionException, S3ServiceException, S3Exception, IOException{
     
-    JSONBuilder builder = new JSONStringer();
-    builder.object()
+    try {
+      _log.info("Deleting temp s3 store");
+      S3Util.deletePath("buffer.zillabyte.com", "test/metamorphosis_test/");
+    } catch (S3ServiceException | S3Exception e1) {
+      _log.error("Deleting temp store failed: ", e1);
+    }    
+    
+    JSONBuilder builderSink = new JSONStringer();
+    builderSink.object()
     .key("topic").value(TOPIC_TO_SINK)
     .key("sink").object()
         .key("type").value("s3")
         .key("retry").value(0)
         .key("config").object()
-          .key("shard_path").value("test/single_worker/")
+          .key("shard_path").value("test/worker_sink_service/"+TOPIC_TO_SINK+"/")
           .key("shard_prefix").value("test_shard_")
           .key("bucket").value("buffer.zillabyte.com")
           .key("credentials").object()
@@ -76,29 +98,20 @@ public class WorkerSinkServiceTest {
         .endObject()
       .endObject()
     .endObject();
+    String sinkMessage = builderSink.toString();    
+    _localKakfaService.sendMessage(CONSUMER_QUEUE_PREFIX + "1", sinkMessage);
 
-    String message = builder.toString();
-    String thisWorkerQueue = _workerQueues.get(0);
-    _localKakfaService.sendMessage(thisWorkerQueue, message);
-
-    // create SchlossService
-    Config.singleton().put("worker.sink.topic", thisWorkerQueue);
-    Config.singleton().put("kafka.zookeeper.connect", _localKakfaService.getZKConnectString());
-    Config.singleton().put("kafka.brokers", Joiner.on(",").join(_localKakfaService.getSeedBrokers()));
-    
-    WorkerService<WorkerSink> workerService = new WorkerSinkService(thisWorkerQueue, _localKakfaService);
-    workerService.start();
-    Thread.sleep(25000); // Give 10 seconds for the worker to get the message
-
-    _log.info("Waiting on future...");
-    workerService.stop(); // Awaits executor pool to finish
-    
-    _log.info("Reading messages for confirmation");
-    //TODO: Figure out how to read all shards that we supposedly wrote.
-    
-    //assertEquals(1000, messages);
-    throw new NotImplementedException("TDD");
-    
-
+    WorkerService<WorkerSink> _workerSinkService = new WorkerSinkService(CONSUMER_QUEUE_PREFIX + "1", _localKakfaService);
+    _workerSinkService.startRoundRobinPushRead()
+      .get();
+    for(int i = 0; i < 11; i++){
+      _log.info("Popping round robin: " + i);
+      _workerSinkService.startRoundRobinPopThread()
+        .get();
+      _log.info("Waiting on Source worker to complete");
+      _workerSinkService.awaitTermination(3, TimeUnit.MINUTES);
+    }
+  
+ 
   }
 }

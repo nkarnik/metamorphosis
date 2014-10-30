@@ -112,20 +112,8 @@ public class LocalKafkaService extends KafkaService{
     _log.info("New topic's metadata is propagated");
   }
 
-  protected ZkClient createZKClient() {
-    String connectString = getZKConnectString();
-    return new ZkClient(connectString, 30000, 30000, ZKStringSerializer$.MODULE$);
-  }
-
-  @Override 
-  public ZkClient createZKClient(String namespace) {
-    String connectString = getZKConnectString(namespace);
-    return new ZkClient(connectString, 30000, 30000, ZKStringSerializer$.MODULE$);
-  }
-
   @Override
   public String getZKConnectString(String namespace) {
-
     return _zkServer.getConnectString() + "/" + namespace;    
   }
   
@@ -199,6 +187,7 @@ public class LocalKafkaService extends KafkaService{
     }finally{
       _log.info("Done trying to read messages");
     }
+    consumer.shutdown();
     return messages;
   }
   
@@ -228,6 +217,7 @@ public class LocalKafkaService extends KafkaService{
     }catch(Exception e) {
       _log.info("Error is: " + e.getMessage());
     }
+    consumer.shutdown();
     return numMessages;
   }
 

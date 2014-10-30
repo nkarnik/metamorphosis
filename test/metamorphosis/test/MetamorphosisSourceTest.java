@@ -146,7 +146,7 @@ public class MetamorphosisSourceTest {
     ZkClient gmbZkClient = _localKakfaService.createGmbZkClient();
     gmbZkClient.waitUntilConnected();
     assertEquals(gmbZkClient.exists("/buffer/" + destinationTopic + "/status/done"), true);
-    
+    gmbZkClient.close();
     try {
       _log.info("Deleting temp s3 store");
       S3Util.deletePath("buffer.zillabyte.com", "test/metamorphosis_test/");

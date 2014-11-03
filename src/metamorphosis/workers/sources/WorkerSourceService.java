@@ -127,11 +127,10 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
       // Distribute strategy
       int msgsSent = 0;
       int bytesReceived = 0;
-      List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
       try{
         for( String workerQueueMessage : messageIterator) {
           //_log.info("Sending message " + workerQueueMessage + " to queue: " + topic);
-          messages.clear();
+          List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
           bytesReceived += workerQueueMessage.getBytes().length;
           messages.add(new KeyedMessage<Integer,String>(topicQueue,workerQueueMessage));
           producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));

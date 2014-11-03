@@ -77,7 +77,7 @@ public class WorkerS3Sink extends WorkerSink {
       File parentDir = new File("/tmp/" + _shardPath);
       parentDir.mkdirs();
       _writer = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(_gzFilePath)), "UTF-8"));
-      _log.info("Created File locally: " + _gzFilePath);
+      _log.debug("Created File locally: " + _gzFilePath);
       while (iterator.hasNext()) {
         MessageAndMetadata<String, String> fetchedMessage = iterator.next();
         String messageBody = fetchedMessage.message();

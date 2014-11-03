@@ -49,10 +49,10 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
     //Do we really want to process this message? Look for the done message in zk.
     _log.debug("Performing zk check...");
     KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
-    
+    CuratorFramework client = null;
     try{
       
-      CuratorFramework client = CuratorFrameworkFactory.builder()
+      client = CuratorFrameworkFactory.builder()
           //.namespace("gmb")
           .retryPolicy(new ExponentialBackoffRetry(1000, 5))
           .connectString(kafkaService.getZKConnectString("gmb"))
@@ -70,11 +70,15 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
         _log.info("Done path (" + bufferTopicPath+ ") found. Stopping sinks. Running one more time to catch tuples we might not have.");
         done = true;
       }
-      client.close();
+
     }catch(Exception e){
       _log.error("SinkService crashed when trying to check for zk done message");
       e.printStackTrace();
       throw new RuntimeException(e);
+    }finally{
+      if(client != null){
+        client.close();
+      }
     }
     _log.debug("Done with zk check...");
     String clientName = topic;
@@ -82,6 +86,8 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
     if(_topicToIteratorCache.containsKey(topic)){
       _log.debug("Using cached iterator for topic: " + topic);
       sinkTopicIterator = _topicToIteratorCache.get(topic);
+      // TODO: Maybe the iterator is in a bad state? Confirm before proceeding
+
     }else{
       Properties props = KafkaUtils.getDefaultProperties(_kafkaService.getZKConnectString("kafka"), clientName);
       props.put("consumer.timeout.ms", Config.singleton().getOrException("kafka.consumer.timeout.ms"));
@@ -113,7 +119,11 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       _log.info("Retrying sink. Sending message: " + poppedMessage.toString() + " to topic: " + _sourceTopic);
       
       producer.close(); 
-      
+    }
+    
+    if(done){
+      _log.info("Shutting down connector for topic: " + _sourceTopic);
+      _consumer.shutdown();
     }
 
   }

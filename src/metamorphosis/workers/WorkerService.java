@@ -94,8 +94,9 @@ public abstract class WorkerService<T extends Worker> {
                 try{
                   processMessage(poppedMessage);
                 }catch(Exception e){
-                  _log.error("Process message error!!");
+                  _log.error("Process message error!! Killing worker!!!");
                   e.printStackTrace();
+                  System.exit(1);
                 }
                 _log.debug("Completed processing message: " + poppedMessage.toString());
                 return null;

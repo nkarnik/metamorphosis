@@ -40,6 +40,8 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
     if(poppedMessage.containsKey("schloss_message")){
       // Special message signifying end of topic
       String topic = poppedMessage.getString("topic");
+      CuratorFramework client = null;
+      InterProcessMutex mutex = null;
       try {
         _log.info("Processing schloss done message for topic: " + topic);
         // Write to zk that you have in fact completed all such messages
@@ -48,11 +50,11 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
         String ourQueue = Config.singleton().getOrException(MetamorphosisService.workerSourceQueue);
         KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
         
-        CuratorFramework client = CuratorFrameworkFactory.builder()
-                                    //.namespace("gmb")
-                                    .retryPolicy(new RetryOneTime(1000))
-                                    .connectString(kafkaService.getZKConnectString("gmb"))
-                                    .build();
+       client = CuratorFrameworkFactory.builder()
+                  //.namespace("gmb")
+                  .retryPolicy(new RetryOneTime(1000))
+                  .connectString(kafkaService.getZKConnectString("gmb"))
+                  .build();
         client.start();
         // ZkClient client = kafkaService.createGmbZkClient();
         _log.debug("Client connecting ...");
@@ -68,7 +70,7 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
           _log.debug("Created path: " + bufferTopicPath);
         }
         
-        InterProcessMutex mutex = new InterProcessMutex(client, lockPath);
+        mutex = new InterProcessMutex(client, lockPath);
 
         if(mutex.acquire(5,TimeUnit.SECONDS)){
           _log.debug("Lock acquired");
@@ -92,6 +94,18 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
         _log.error("Couldn't process schloss_message");
         e.printStackTrace();
         throw new RuntimeException(e);
+      } finally{
+        if(mutex.isAcquiredInThisProcess()){
+          try {
+            mutex.release();
+          } catch (Exception e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+          }
+        }
+        if(client != null){
+          client.close();
+        }
       }
     }else{
       WorkerSource workerSource = _workerFactory.createWorker(poppedMessage);

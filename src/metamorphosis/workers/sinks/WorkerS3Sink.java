@@ -35,7 +35,7 @@ public class WorkerS3Sink extends WorkerSink {
   private JSONObject _sinkObject;
 
   private String _shardPrefix;
-  ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(1000);
+  //ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(1000);
 
   private int _retryNum;
 
@@ -93,10 +93,7 @@ public class WorkerS3Sink extends WorkerSink {
         }
       }
     }catch(ConsumerTimeoutException e){
-      if(_ticker.tick()){
-        _log.info("[sampled #" + _ticker.counter() + "] Consumer timed out. maybe flush " + _numMessages + " messages");  
-      }
-      
+      _log.info("Consumer timed out. maybe flush " + _numMessages + " messages");  
       maybeFlush(true);
     }
     catch (IOException ioe) {

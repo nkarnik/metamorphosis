@@ -36,7 +36,7 @@ public class WorkerSinkServiceTest {
   private String CONSUMER_QUEUE_PREFIX = "consumer_queue_";
   private int NUM_BROKERS = 3;
   private Logger _log = Logger.getLogger(WorkerSourceServiceTest.class);
-  private String TOPIC_TO_SINK = "more_test";
+  private String TOPIC_TO_SINK = "more_test_cycle_1";
 
   @Before
   public void setup() {
@@ -76,7 +76,7 @@ public class WorkerSinkServiceTest {
     
     try {
       _log.info("Deleting temp s3 store");
-      S3Util.deletePath("buffer.zillabyte.com", "test/metamorphosis_test/");
+      S3Util.deletePath("buffer.zillabyte.com", "test/worker_sink_service/");
     } catch (S3ServiceException | S3Exception e1) {
       _log.error("Deleting temp store failed: ", e1);
     }    
@@ -101,17 +101,40 @@ public class WorkerSinkServiceTest {
     String sinkMessage = builderSink.toString();    
     _localKakfaService.sendMessage(CONSUMER_QUEUE_PREFIX + "1", sinkMessage);
 
-    WorkerService<WorkerSink> _workerSinkService = new WorkerSinkService(CONSUMER_QUEUE_PREFIX + "1", _localKakfaService);
-    _workerSinkService.startRoundRobinPushRead()
+    WorkerService<WorkerSink> workerSinkService = new WorkerSinkService(CONSUMER_QUEUE_PREFIX + "1", _localKakfaService);
+    workerSinkService.setRunning(false);
+    workerSinkService.startRoundRobinPushRead()
       .get();
-    for(int i = 0; i < 11; i++){
-      _log.info("Popping round robin: " + i);
-      _workerSinkService.startRoundRobinPopThread()
-        .get();
-      _log.info("Waiting on Source worker to complete");
-      _workerSinkService.awaitTermination(3, TimeUnit.MINUTES);
-    }
+    
+    _log.info("Popping round robin: ");
+    workerSinkService.startRoundRobinPopThread()
+      .get();
+    _log.info("Waiting on Source worker to complete");
+    workerSinkService.awaitTermination(3, TimeUnit.MINUTES);
   
- 
+    int totalSunk = 0;
+    
+    S3Object[] shards;
+    try {
+      shards = S3Util.listPath("buffer.zillabyte.com", "test/worker_sink_service/more_test/cycle_1/");
+      for (S3Object shard: shards) {
+        String shardPath = shard.getKey();
+        String shardBucket = shard.getBucketName();
+        
+        try {
+          String[] sunk = S3Util.readGzipFile(shardBucket, shardPath).split("\n");
+          totalSunk += sunk.length;
+          _log.info("Received a total of " + totalSunk + " bytes");
+        } catch (IOException e) {
+          // TODO Auto-generated catch block
+          e.printStackTrace();
+        }
+      }
+    } catch (S3ServiceException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+    _log.info("Final number of messages on s3: " + totalSunk);
+    assertEquals(BATCHES * PER_BATCH, totalSunk);
   }
 }

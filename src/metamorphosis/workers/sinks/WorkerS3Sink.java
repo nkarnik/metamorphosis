@@ -35,13 +35,15 @@ public class WorkerS3Sink extends WorkerSink {
   private JSONObject _sinkObject;
 
   private String _shardPrefix;
-  ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(1000);
+  //ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(1000);
 
   private int _retryNum;
 
   private int _numMessagesThisShard;
 
   private String _gzFilePath;
+
+  private int _cycle;
 
   public WorkerS3Sink(JSONObject message) {
     // TODO Auto-generated constructor stub
@@ -50,9 +52,23 @@ public class WorkerS3Sink extends WorkerSink {
     _retryNum = _sinkObject.getInt("retry");
     JSONObject config = _sinkObject.getJSONObject("config");
     _bucketName = config.getString("bucket");
-    _shardPath = config.getString("shard_path");
     _shardPrefix = config.getString("shard_prefix");
+    
     _topicToRead = message.getString("topic");
+    _shardPath = config.getString("shard_path");
+    if(_topicToRead.contains("_cycle_") ){
+      String[] split = _topicToRead.split("_cycle_");
+      _cycle = Integer.parseInt(split[1]);
+      _topicToRead = split[0];
+       
+    }else{
+      _cycle = 0;
+    }
+    if(_shardPath.contains("_cycle_")){
+      _shardPath = _shardPath.replace("_cycle_" + _cycle, "");
+    }    
+    _shardPath += "cycle_" + _cycle + "/";
+    
     _numMessages = 0;
     _numMessagesThisShard = 1000; // _retryNum < 10 ? (_retryNum + 1) * 100 : 1000;
   }
@@ -93,11 +109,11 @@ public class WorkerS3Sink extends WorkerSink {
         }
       }
     }catch(ConsumerTimeoutException e){
-      if(_ticker.tick()){
-        _log.info("[sampled #" + _ticker.counter() + "] Consumer timed out. maybe flush " + _numMessages + " messages");  
+      _log.info("Consumer timed out. maybe flush " + _numMessages + " messages");  
+      if(maybeFlush(true)){
+        _log.info("Flushed shard to S3: " + _shardFull);
+
       }
-      
-      maybeFlush(true);
     }
     catch (IOException ioe) {
       _log.error("Sink Error !!!");

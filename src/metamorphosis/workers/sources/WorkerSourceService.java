@@ -107,7 +107,7 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
           client.close();
         }
       }
-    }else{
+    }else{ // Not a schloss message
       WorkerSource workerSource = _workerFactory.createWorker(poppedMessage);
       Pair<File,Iterable<String>> messageIteratorPair = workerSource.getMessageIterator();
       Iterable<String> messageIterator = messageIteratorPair.getValue1();
@@ -133,8 +133,12 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
           List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
           bytesReceived += workerQueueMessage.getBytes().length;
           messages.add(new KeyedMessage<Integer,String>(topicQueue,workerQueueMessage));
-          producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
-          msgsSent++;
+          try{
+            producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
+            msgsSent++;
+          }catch(kafka.common.FailedToSendMessageException e){
+            _log.info("Failed to send. Message too large? " + workerQueueMessage.getBytes().length);
+          }
         }
         
       }finally{

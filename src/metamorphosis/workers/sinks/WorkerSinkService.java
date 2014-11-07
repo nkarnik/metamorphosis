@@ -125,14 +125,9 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
     }
     
     if(done){
-      _log.info("Shutting down connector for topic: " + _sourceTopic);
+      _log.info("Shutting down connector for topic: " + topic);
+      _topicToIteratorCache.remove(topic);
       _consumer.shutdown();
     }
-
   }
-  
-  
-  
-  
-
 }

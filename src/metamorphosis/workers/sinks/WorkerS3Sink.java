@@ -58,6 +58,8 @@ public class WorkerS3Sink extends WorkerSink {
     _shardPath = config.getString("shard_path");
     if(_topicToRead.contains("_cycle_") ){
       String[] split = _topicToRead.split("_cycle_");
+      _log.info("Cycle number: " + split[1]);
+      
       _cycle = Integer.parseInt(split[1]);
       _topicToRead = split[0];
        

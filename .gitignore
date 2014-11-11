@@ -23,4 +23,6 @@ to_be*
 bin
 *.swp
 *.class
+.classpath
+.project
 

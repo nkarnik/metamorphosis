@@ -116,7 +116,7 @@ public class WorkerSinkServiceTest {
     
     S3Object[] shards;
     try {
-      shards = S3Util.listPath("buffer.zillabyte.com", "test/worker_sink_service/more_test/cycle_1/");
+      shards = S3Util.listPath("buffer.zillabyte.com", "test/worker_sink_service/more_test/");
       for (S3Object shard: shards) {
         String shardPath = shard.getKey();
         String shardBucket = shard.getBucketName();

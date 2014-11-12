@@ -137,7 +137,7 @@ public class MetamorphosisSourceTest {
     _log.info("Reading messages for confirmation for source phase");
     _log.info("");
     _log.info("");
-    int numMessages = _localKakfaService.readNumMessages(destinationTopic);
+    long numMessages = _localKakfaService.getTopicMessageCount(destinationTopic);
     _log.info("");
     _log.info("Total messages on producer queues: " + numMessages);   
     _log.info("");

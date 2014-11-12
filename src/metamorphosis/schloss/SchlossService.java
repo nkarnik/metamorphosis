@@ -91,8 +91,7 @@ public class SchlossService {
   private ConsumerIterator<String, JSONObject> getIterator(String messageTopic) {
     String clientName = "schloss_service_consumer_" + messageTopic;
     Properties props = KafkaUtils.getDefaultProperties(_zkConnectString, clientName);
-    String consumerTimeout = Config.singleton().getOrException("kafka.consumer.timeout.ms");
-    props.put("consumer.timeout.ms", consumerTimeout);
+    props.put("consumer.timeout.ms", Config.singleton().<String>getOrException("kafka.consumer.timeout.ms"));
         
     ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(new ConsumerConfig(props));
 
@@ -181,6 +180,9 @@ public class SchlossService {
             _log.info("[sampled #" + _ticker.counter() + "] No messages yet on " + _messageQueue + ". "); 
           }
         }
+        
+        // Row counters.
+        // KafkaUtils.readAllPartitions(brokerList, topic, partitions);
       }while(isRunning.get());
       _log.info("Done with the schloss service loop");
       return null;

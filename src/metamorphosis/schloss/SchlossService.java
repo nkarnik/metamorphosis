@@ -52,18 +52,17 @@ public class SchlossService {
   private Future<Void> _sinkReadThread;
   //private KafkaService _kafkaService;
   ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(10);
-  
+
   public SchlossService() {
-    
+
     _brokers = Lists.newArrayList(((String) Config.singleton().getOrException("kafka.brokers")).split(","));
     _zkConnectString = Config.singleton().getOrException("kafka.zookeeper.connect");
     _sourceTopic = Config.singleton().getOrException("schloss.source.queue");
     _sinkTopic = Config.singleton().getOrException("schloss.sink.queue");
-    
-    
+
   }
-  
-  
+
+
 
   public void start() {
     // Start while loop
@@ -86,13 +85,13 @@ public class SchlossService {
     return _sourceReadThread;
   }
 
-  
-  
+
+
   private ConsumerIterator<String, JSONObject> getIterator(String messageTopic) {
     String clientName = "schloss_service_consumer_" + messageTopic;
     Properties props = KafkaUtils.getDefaultProperties(_zkConnectString, clientName);
     props.put("consumer.timeout.ms", Config.singleton().<String>getOrException("kafka.consumer.timeout.ms"));
-        
+
     ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(new ConsumerConfig(props));
 
     Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
@@ -106,14 +105,14 @@ public class SchlossService {
     _log.info("");
     return iterator;
   }
-  
+
   public void setRunning(boolean state){
     isRunning = new AtomicBoolean(state);
   }
   public void stop(){
     _log.info("Shutting down schloss");
     isRunning.set(false);
-    
+
     try {
       if(_sourceReadThread != null && !_sourceReadThread.isDone()){
         _log.info("Waiting on source read thread");
@@ -131,9 +130,9 @@ public class SchlossService {
     }
   }
 
-  
- private abstract class SchlossReadThread<T extends SchlossDistributor> implements Callable<Void> {
-    
+
+  private abstract class SchlossReadThread<T extends SchlossDistributor> implements Callable<Void> {
+
     private String[] _workerQueues;
     private String _messageQueue;
     private SchlossFactory<T> _factory;
@@ -145,13 +144,13 @@ public class SchlossService {
       _factory = factory;
       _log.info("Created read thread for queue: " + _messageQueue + " with factory of type: " + _factory);
     } 
-    
+
     public abstract void distributeMessagesToQueues(String[] _workerQueues, List<String> workerQueueMessages, String topic);
-    
+
     @Override
     public Void call() throws Exception {
       _log.info("Entering schloss service loop for topic: " + _messageQueue);
-      
+
       // Create an iterator
       ConsumerIterator<String, JSONObject> iterator = getIterator(_messageQueue);
       do{
@@ -161,7 +160,7 @@ public class SchlossService {
             MessageAndMetadata<String, JSONObject> next = iterator.next();
             JSONObject message = next.message();
             String topic = message.getString("topic");
-            
+
             _log.info("Processing message: " + message.toString());
             KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
             if(kafkaService.hasTopic(topic)){
@@ -173,80 +172,107 @@ public class SchlossService {
             SchlossDistributor schlossHandler = _factory.createSchlossDistributor(message);
             List<String> workerQueueMessages = schlossHandler.getWorkerMessages();
             distributeMessagesToQueues(_workerQueues, workerQueueMessages, topic);
-            
+
           }
         }catch(ConsumerTimeoutException e){
           if(_ticker.tick()){
             _log.info("[sampled #" + _ticker.counter() + "] No messages yet on " + _messageQueue + ". "); 
           }
         }
-        
+
         // Row counters.
         // KafkaUtils.readAllPartitions(brokerList, topic, partitions);
+
+        handleTimeoutTasks();
+
       }while(isRunning.get());
       _log.info("Done with the schloss service loop");
       return null;
     }
-  }
- 
- public class SchlossSourceReadThread extends SchlossReadThread<SchlossSource>{
 
-  private int _queueToPush = 0;
-  public SchlossSourceReadThread(String messageTopic) {
-    super(messageTopic, "worker.source.queues", new SchlossSourceFactory());
+    public abstract void handleTimeoutTasks();
   }
-  
-  public void distributeMessagesToQueues(String[] workerQueues, List<String> workerQueueMessages, String topic) {
-    // Distribute strategy
-    _log.info("Distributing " + workerQueueMessages.size() + " messages to " + workerQueues.length + " brokers.");
-    List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
-    for( String workerQueueMessage : workerQueueMessages) {
-      int numQueues = workerQueues.length;
-      String workerQueueTopic = workerQueues[_queueToPush % numQueues];
-      
-      _log.debug("Distributing message  to queue: " + workerQueueTopic + " msg:: " + workerQueueMessage);
-      messages.add(new KeyedMessage<Integer,String>(workerQueueTopic,workerQueueMessage));
-      _queueToPush += 1;
+
+  public class SchlossSourceReadThread extends SchlossReadThread<SchlossSource>{
+
+    private int _queueToPush = 0;
+    public SchlossSourceReadThread(String messageTopic) {
+      super(messageTopic, "worker.source.queues", new SchlossSourceFactory());
     }
-    //Create the producer for this distribution
-    Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_brokers), "kafka.producer.DefaultPartitioner");
-    Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
-    producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
-    // Now that messages are distributed, send a DONE message to all the queues for this topic
-    messages.clear();
-    for( String workerQueue : workerQueues) {
-      messages.add(new KeyedMessage<Integer,String>(workerQueue,"{\"topic\":\"" + topic + "\", \"schloss_message\":\"done\"}" ));
+
+    public void distributeMessagesToQueues(String[] workerQueues, List<String> workerQueueMessages, String topic) {
+      // Distribute strategy
+      _log.info("Distributing " + workerQueueMessages.size() + " messages to " + workerQueues.length + " brokers.");
+      List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
+      for( String workerQueueMessage : workerQueueMessages) {
+        int numQueues = workerQueues.length;
+        String workerQueueTopic = workerQueues[_queueToPush % numQueues];
+
+        _log.debug("Distributing message  to queue: " + workerQueueTopic + " msg:: " + workerQueueMessage);
+        messages.add(new KeyedMessage<Integer,String>(workerQueueTopic,workerQueueMessage));
+        _queueToPush += 1;
+      }
+      //Create the producer for this distribution
+      Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_brokers), "kafka.producer.DefaultPartitioner");
+      Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
+      producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
+      // Now that messages are distributed, send a DONE message to all the queues for this topic
+      messages.clear();
+      for( String workerQueue : workerQueues) {
+        messages.add(new KeyedMessage<Integer,String>(workerQueue,"{\"topic\":\"" + topic + "\", \"schloss_message\":\"done\"}" ));
+      }
+      producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
+      producer.close();
+      _log.info("Done with distribution.");
+
     }
-    producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
-    producer.close();
-    _log.info("Done with distribution.");
-    
-  }
- }
- 
- public class SchlossSinkReadThread extends SchlossReadThread<SchlossSink>{
 
-  public SchlossSinkReadThread(String messageTopic) {
-    super(messageTopic, "worker.sink.queues", new SchlossSinkFactory());
+    @Override
+    public void handleTimeoutTasks() {
 
+    }
   }
 
-  @Override
-  public void distributeMessagesToQueues(String[] workerQueues, List<String> workerQueueMessages, String topic) {
-    // Write to all topics.
-    _log.info("Schloss Sink distributing " + workerQueueMessages.size() + " messages to " + workerQueues.length + " queues" );
-    List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
-    for(String workerSinkQ: workerQueues){
-      for(String queueMessage : workerQueueMessages){
-        messages.add(new KeyedMessage<Integer,String>(workerSinkQ,queueMessage));  
+  public class SchlossSinkReadThread extends SchlossReadThread<SchlossSink>{
+
+    private List<String> _activeSinkTopics = Lists.newArrayList();
+
+    public SchlossSinkReadThread(String messageTopic) {
+      super(messageTopic, "worker.sink.queues", new SchlossSinkFactory());
+
+    }
+
+    @Override
+    public void distributeMessagesToQueues(String[] workerQueues, List<String> workerQueueMessages, String topic) {
+      // Write to all topics.
+      _log.info("Schloss Sink distributing " + workerQueueMessages.size() + " messages to " + workerQueues.length + " queues" );
+      List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
+      for(String workerSinkQ: workerQueues){
+        for(String queueMessage : workerQueueMessages){
+          messages.add(new KeyedMessage<Integer,String>(workerSinkQ,queueMessage));  
+        }
+      }
+      //Create the producer for this distribution
+      Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_brokers), "kafka.producer.DefaultPartitioner");
+      Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
+      producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
+      producer.close(); 
+    }
+
+    @Override
+    public void handleTimeoutTasks() {
+      // Every timeout, update row count of the active sinks
+      List<String> removals = Lists.newArrayList();
+      KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
+      // Check if sink is inactive
+      for(String topic: _activeSinkTopics){
+        if(KafkaUtils.isSinkActive(topic)){
+           removals.add(topic);
+        }
+        // Regardless of removals, update topic size to API.
+        long messageCount = kafkaService.getTopicMessageCount(topic);
+        
       }
     }
-    //Create the producer for this distribution
-    Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_brokers), "kafka.producer.DefaultPartitioner");
-    Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
-    producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
-    producer.close(); 
   }
-   
- }
 }

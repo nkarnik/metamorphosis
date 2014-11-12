@@ -11,11 +11,9 @@ import kafka.producer.ProducerConfig;
 import metamorphosis.MetamorphosisService;
 import metamorphosis.kafka.KafkaService;
 import metamorphosis.utils.Config;
-import metamorphosis.utils.Utils;
 import metamorphosis.workers.WorkerService;
 import net.sf.json.JSONObject;
 
-import org.I0Itec.zkclient.ZkClient;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.recipes.locks.InterProcessMutex;

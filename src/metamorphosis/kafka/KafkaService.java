@@ -13,19 +13,15 @@ import kafka.api.PartitionMetadata;
 import kafka.api.PartitionOffsetRequestInfo;
 import kafka.api.TopicMetadata;
 import kafka.common.TopicAndPartition;
-import kafka.javaapi.OffsetResponse;
 import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.producer.Producer;
 import kafka.producer.ProducerConfig;
 import kafka.utils.TestUtils;
 import kafka.utils.ZKStringSerializer$;
 import metamorphosis.utils.Config;
-import metamorphosis.utils.KafkaUtils;
 
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.log4j.Logger;
-
-import scala.collection.Seq;
 
 import com.google.common.base.Joiner;
 

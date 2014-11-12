@@ -1,22 +1,21 @@
 package metamorphosis.utils;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 
-import kafka.api.PartitionOffsetRequestInfo;
 import kafka.cluster.Broker;
-import kafka.common.TopicAndPartition;
 import kafka.consumer.ConsumerConfig;
-import kafka.javaapi.OffsetResponse;
 import kafka.javaapi.PartitionMetadata;
 import kafka.javaapi.TopicMetadata;
 import kafka.javaapi.TopicMetadataRequest;
 import kafka.javaapi.TopicMetadataResponse;
 import kafka.javaapi.consumer.SimpleConsumer;
+import metamorphosis.kafka.KafkaService;
 
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.log4j.Logger;
 
 public class KafkaUtils {
@@ -80,5 +79,42 @@ public class KafkaUtils {
     return props;
   }
   
+  public static  boolean isSinkActive(String topic) {
+    boolean done = false;
+    _log.debug("Performing zk check...");
+    KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
+    CuratorFramework client = null;
+    try{
+      
+      client = CuratorFrameworkFactory.builder()
+          //.namespace("gmb")
+          .retryPolicy(new ExponentialBackoffRetry(1000, 5))
+          .connectString(kafkaService.getZKConnectString("gmb"))
+          .build();
+      client.start();
+      
+      String bufferTopicPath = "/buffer/" + topic + "/status/done";
+      
+      if(client.checkExists().forPath(bufferTopicPath) == null){
+        // Yes, we do want to process it.
+        _log.debug("Done path (" + bufferTopicPath+ ") not found." );
+      }else{
+        // Buffer is done being written to.
+        // TODO: Maybe the sinks didn't exhaust them... confirm.
+        _log.info("Done path (" + bufferTopicPath+ ") found.");
+        done = true;
+      }
 
+    }catch(Exception e){
+      _log.error("SinkService crashed when trying to check for zk done message");
+      e.printStackTrace();
+      throw new RuntimeException(e);
+    }finally{
+      if(client != null){
+        client.close();
+      }
+    }
+    _log.debug("Done with zk check...");
+    return done;
+  }
 }

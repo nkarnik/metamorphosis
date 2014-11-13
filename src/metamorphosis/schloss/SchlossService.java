@@ -267,12 +267,13 @@ public class SchlossService {
 
     @Override
     public void handleTimeoutTasks() {
-      _log.info("Handling API Size update");
       // Every timeout, update row count of the active sinks
       List<String> removals = Lists.newArrayList();
       KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
       // Check if sink is inactive
       for(String topic: _activeSinkTopics){
+        _log.info("Handling API Size update for topic: " + topic);
+
         if(KafkaUtils.isSinkActive(topic)){
            removals.add(topic);
         }
@@ -281,13 +282,15 @@ public class SchlossService {
         JSONObject params = new JSONObject();
         params.put("relation_id", topic);
         params.put("size", messageCount);
-        
+        _log.info("New topic size: " + topic + ":: " + messageCount);
+
         try {
           RestAPIHelper.post("/relations/" + topic + "/size", params.toString(), API_AUTH_TOKEN);
         } catch (APIException e) {
           throw new APIException("Set size failed for relation: " + topic);
         }
       }
+      _activeSinkTopics.removeAll(removals);
     }
   }
 }

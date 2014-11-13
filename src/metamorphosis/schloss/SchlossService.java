@@ -27,10 +27,12 @@ import metamorphosis.schloss.sinks.SchlossSink;
 import metamorphosis.schloss.sinks.SchlossSinkFactory;
 import metamorphosis.schloss.sources.SchlossSource;
 import metamorphosis.schloss.sources.SchlossSourceFactory;
+import metamorphosis.utils.APIException;
 import metamorphosis.utils.Config;
 import metamorphosis.utils.ExponentialBackoffTicker;
 import metamorphosis.utils.JSONDecoder;
 import metamorphosis.utils.KafkaUtils;
+import metamorphosis.utils.RestAPIHelper;
 import metamorphosis.utils.Utils;
 import net.sf.json.JSONObject;
 
@@ -40,6 +42,7 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 
 public class SchlossService {
+  protected static final String API_AUTH_TOKEN = "__zilla_web_of_trust__643eb89103d9490fb3cbc98c06f87dea7e6df97e4ab33cee1221f0f0169cae362305879837b841ef5f2ecab1381db72e0259";
 
   protected static final long SLEEP_BETWEEN_READS = 30 * 1000;
   private static AtomicBoolean isRunning;
@@ -271,7 +274,15 @@ public class SchlossService {
         }
         // Regardless of removals, update topic size to API.
         long messageCount = kafkaService.getTopicMessageCount(topic);
+        JSONObject params = new JSONObject();
+        params.put("relation_id", topic);
+        params.put("size", messageCount);
         
+        try {
+          RestAPIHelper.post("/relations/" + topic + "/size", params.toString(), API_AUTH_TOKEN);
+        } catch (APIException e) {
+          throw new APIException("Set size failed for relation: " + topic);
+        }
       }
     }
   }

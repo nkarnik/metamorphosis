@@ -159,7 +159,8 @@ public class MetamorphosisService {
       exitWithHelp(availOptions);
       return;
     }
-    Config.singleton().put("environment", options.getOptionValue("environment"));
+    String env = options.getOptionValue("environment");
+    Config.singleton().put("environment", env);
     Config.singleton().put("kafka.brokers", options.getOptionValue("kafka.brokers", "192.168.111.107:9092,192.168.111.108:9092"));
     String zkHost = options.getOptionValue("kafka.zookeeper.host", "192.168.111.106");
     String zkPort = options.getOptionValue("kafka.zookeeper.port", "2181");
@@ -167,12 +168,26 @@ public class MetamorphosisService {
     Config.singleton().put("kafka.zookeeper.port", zkPort);
     Config.singleton().put("kafka.zookeeper.connect", zkHost + ":" + zkPort + "/kafka");
     Config.singleton().put("gmb.zookeeper.connect", zkHost + ":" + zkPort + "/gmb");
-
+    String apiHost;
+    switch(env){
+    case "test":
+      apiHost = "test.api.zillabyte.com";
+      break;
+    case "prod":
+      apiHost = "api.zillabyte.com";
+      break;
+    default:
+      apiHost = "localhost";
+      break;
+    }
+    Config.singleton().put("api.host", apiHost);
     Config.singleton().put("kafka.consumer.timeout.ms", options.getOptionValue("kafka.consumer.timeout.ms"));
     String service = options.getOptionValue("service");
 
     KafkaService kafkaService = new KafkaService();
     Config.singleton().put("kafka.service", kafkaService);
+    
+    
     
     System.out.println(Config.singleton().toString());
     _log.info("Starting service: " + service);
@@ -219,7 +234,7 @@ public class MetamorphosisService {
       break;
       
     default:
-        System.out.println("Bad value required parameter 'service'. Can be schloss or worker. Received: " + service);
+        _log.error("Bad value required parameter 'service'. Can be schloss or worker. Received: " + service);
         exitWithHelp(availOptions);
         return;
     }

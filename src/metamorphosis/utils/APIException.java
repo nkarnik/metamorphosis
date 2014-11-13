@@ -1,6 +1,6 @@
 package metamorphosis.utils;
 
-public class APIException extends Exception {
+public class APIException extends RuntimeException {
 
   public APIException(String message) {
     super(message);

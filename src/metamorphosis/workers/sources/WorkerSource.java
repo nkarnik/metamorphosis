@@ -2,9 +2,9 @@ package metamorphosis.workers.sources;
 
 import java.io.File;
 
-import org.javatuples.Pair;
-
 import metamorphosis.workers.Worker;
+
+import org.javatuples.Pair;
 
 public abstract class WorkerSource implements Worker {
 

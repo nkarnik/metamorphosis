@@ -2,8 +2,8 @@ package metamorphosis.schloss.test;
 
 import static org.junit.Assert.assertEquals;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import metamorphosis.kafka.LocalKafkaService;
 import metamorphosis.schloss.SchlossService;
@@ -45,7 +45,7 @@ public class SchlossTest {
   }
 
   @Test
-  public void testProcessGMBSourceMessage() throws InterruptedException {
+  public void testProcessGMBSourceMessage() throws InterruptedException, ExecutionException {
 
     JSONBuilder builder = new JSONStringer();
     String destinationTopic = "some_topic";
@@ -67,6 +67,32 @@ public class SchlossTest {
     String message = builder.toString();
 
     // GMB sends message to schloss topic
+    initSchlossServiceConfig();
+    
+    _localKakfaService.sendMessage(SOURCE_TOPIC, message);
+    List<String> readStringMessagesInTopic = _localKakfaService.readStringMessagesInTopic(SOURCE_TOPIC);
+    _log.info("Messages in source_queue now are: " + Joiner.on("\n").join(readStringMessagesInTopic));
+    
+    SchlossService schlossService = new SchlossService();
+    // run SchlossService
+    schlossService.setRunning(false);
+    schlossService.startSourceReadThread()
+      .get();
+
+    _log.info("Reading messages for confirmation");
+    int receivedMessagesSize = 0;
+    for (int i = 0; i < NUM_BROKERS; i++) {
+      List<String> messages = _localKakfaService.readStringMessagesInTopic(PRODUCER_QUEUE_PREFIX + i);
+      _log.info("There are " + messages.size() + " messages in this queue");
+      receivedMessagesSize += messages.size();
+    }
+    _log.info("Total messages on producer queues: " + receivedMessagesSize);
+    // Each broker gets a DONE message.
+    assertEquals(10 + NUM_BROKERS, receivedMessagesSize);
+
+  }
+
+  private void initSchlossServiceConfig() {
     // create SchlossService
     Config.singleton().put("schloss.source.queue", SOURCE_TOPIC);
     Config.singleton().put("schloss.sink.queue", SINK_TOPIC);
@@ -77,28 +103,5 @@ public class SchlossTest {
     Config.singleton().put("worker.source.queues", Joiner.on(",").join(_workerSourceQueues));
     Config.singleton().put("worker.sink.queues", Joiner.on(",").join(_workerSinkQueues));
     Config.singleton().put("kafka.service", _localKakfaService);
-    
-    _localKakfaService.sendMessage(SOURCE_TOPIC, message);
-    List<String> readStringMessagesInTopic = _localKakfaService.readStringMessagesInTopic(SOURCE_TOPIC);
-    _log.info("Messages in source_queue now are: " + Joiner.on("\n").join(readStringMessagesInTopic));
-    
-    SchlossService schlossService = new SchlossService();
-    // run SchlossService
-    schlossService.start();
-    // verify that SchlossService fills producer_qs
-    Thread.sleep(15000);
-
-    schlossService.stop();
-    _log.info("Reading messages for confirmation");
-    List<String> receivedMessages = new ArrayList<String>();
-    for (int i = 0; i < NUM_BROKERS; i++) {
-      List<String> messages = _localKakfaService.readStringMessagesInTopic(PRODUCER_QUEUE_PREFIX + i);
-      _log.info("There are " + messages.size() + " messages in this queue");
-      receivedMessages.addAll(messages);
-    }
-    _log.info("Total messages on producer queues: " + receivedMessages.size());
-    
-    assertEquals(10 + NUM_BROKERS, receivedMessages.size() );
-
   }
 }

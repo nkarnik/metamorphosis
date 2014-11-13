@@ -14,7 +14,6 @@ import metamorphosis.utils.s3.S3Exception;
 import metamorphosis.utils.s3.S3Util;
 import metamorphosis.workers.WorkerService;
 import metamorphosis.workers.sinks.WorkerSink;
-import metamorphosis.workers.sinks.WorkerSinkFactory;
 import metamorphosis.workers.sinks.WorkerSinkService;
 import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;
@@ -36,7 +35,7 @@ public class WorkerSinkServiceTest {
   private String CONSUMER_QUEUE_PREFIX = "consumer_queue_";
   private int NUM_BROKERS = 3;
   private Logger _log = Logger.getLogger(WorkerSourceServiceTest.class);
-  private String TOPIC_TO_SINK = "more_test_cycle_1";
+  private String TOPIC_TO_SINK = "single_worker_sink";
 
   @Before
   public void setup() {
@@ -88,7 +87,7 @@ public class WorkerSinkServiceTest {
         .key("type").value("s3")
         .key("retry").value(0)
         .key("config").object()
-          .key("shard_path").value("test/worker_sink_service/"+TOPIC_TO_SINK+"/")
+          .key("shard_path").value("test/worker_sink_service/" + TOPIC_TO_SINK + "/")
           .key("shard_prefix").value("test_shard_")
           .key("bucket").value("buffer.zillabyte.com")
           .key("credentials").object()
@@ -116,7 +115,7 @@ public class WorkerSinkServiceTest {
     
     S3Object[] shards;
     try {
-      shards = S3Util.listPath("buffer.zillabyte.com", "test/worker_sink_service/more_test/");
+      shards = S3Util.listPath("buffer.zillabyte.com", "test/worker_sink_service/" + TOPIC_TO_SINK + "/");
       for (S3Object shard: shards) {
         String shardPath = shard.getKey();
         String shardBucket = shard.getBucketName();

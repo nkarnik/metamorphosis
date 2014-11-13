@@ -287,7 +287,9 @@ public class SchlossService {
         try {
           RestAPIHelper.post("/relations/" + topic + "/size", params.toString(), API_AUTH_TOKEN);
         } catch (APIException e) {
-          throw new APIException("Set size failed for relation: " + topic);
+          _log.error("Failed updating topic size : " + topic);
+          e.printStackTrace();
+          //throw new APIException("Set size failed for relation: " + topic);
         }
       }
       _activeSinkTopics.removeAll(removals);

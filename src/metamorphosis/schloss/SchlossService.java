@@ -269,11 +269,11 @@ public class SchlossService {
     @Override
     public void handleTimeoutTasks() {
       if(_activeSinkTopics.size() == 0){
-        
-      }else{
         if(_ticker.tick()){
-          _log.info("[sampled #" + _ticker.counter() + "] Handling topic size updates: Active topics: " + Joiner.on(",").join(_activeSinkTopics));
+          _log.info("[sampled #" + _ticker.counter() + "] No active topics.");
         }
+      }else{
+        _log.info("Handling topic size updates: Active topics: " + Joiner.on(",").join(_activeSinkTopics));
       }
       // Every timeout, update row count of the active sinks
       List<String> removals = Lists.newArrayList();

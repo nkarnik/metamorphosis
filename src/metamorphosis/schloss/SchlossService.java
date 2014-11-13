@@ -54,7 +54,6 @@ public class SchlossService {
   private Future<Void> _sourceReadThread;
   private Future<Void> _sinkReadThread;
   //private KafkaService _kafkaService;
-  ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(10);
 
   public SchlossService() {
 
@@ -139,6 +138,7 @@ public class SchlossService {
     private String[] _workerQueues;
     private String _messageQueue;
     private SchlossFactory<T> _factory;
+    ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(100);
 
     public SchlossReadThread(String messageTopic, String targetWorkerQueues, SchlossFactory<T> factory){
       String workerQueuesString = Config.singleton().getOrException(targetWorkerQueues);
@@ -239,7 +239,7 @@ public class SchlossService {
   public class SchlossSinkReadThread extends SchlossReadThread<SchlossSink>{
 
     private List<String> _activeSinkTopics = Lists.newArrayList();
-
+    ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(100); 
     public SchlossSinkReadThread(String messageTopic) {
       super(messageTopic, "worker.sink.queues", new SchlossSinkFactory());
 
@@ -268,7 +268,13 @@ public class SchlossService {
 
     @Override
     public void handleTimeoutTasks() {
-      _log.info("Handling topic size updates: Active topics: " + Joiner.on(",").join(_activeSinkTopics));
+      if(_activeSinkTopics.size() == 0){
+        
+      }else{
+        if(_ticker.tick()){
+          _log.info("[sampled #" + _ticker.counter() + "] Handling topic size updates: Active topics: " + Joiner.on(",").join(_activeSinkTopics));
+        }
+      }
       // Every timeout, update row count of the active sinks
       List<String> removals = Lists.newArrayList();
       KafkaService kafkaService = Config.singleton().getOrException("kafka.service");

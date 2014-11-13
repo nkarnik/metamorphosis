@@ -78,7 +78,7 @@ public class RestAPIHelper {
   
   public static JSONObject post(String path, String body, String authToken) throws APIException {
     Client client = Client.create();
-    String url = "http://" + getHost() + ":" + getPort() + path;
+    String url = "http://" + getHost() + path;
 
     log.info("post: " + url + " body: " + body);
 

@@ -256,6 +256,7 @@ public class SchlossService {
         }
       }
       // Add to active sink topics so size can be updated
+      _log.info("Adding active sink topic: " + topic);
       _activeSinkTopics.add(topic);
       
       //Create the producer for this distribution
@@ -267,6 +268,7 @@ public class SchlossService {
 
     @Override
     public void handleTimeoutTasks() {
+      _log.info("Handling topic size updates: Active topics: " + Joiner.on(",").join(_activeSinkTopics));
       // Every timeout, update row count of the active sinks
       List<String> removals = Lists.newArrayList();
       KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
@@ -283,13 +285,16 @@ public class SchlossService {
         params.put("relation_id", topic);
         params.put("size", messageCount);
         _log.info("New topic size: " + topic + ":: " + messageCount);
-
-        try {
-          RestAPIHelper.post("/relations/" + topic + "/size", params.toString(), API_AUTH_TOKEN);
-        } catch (APIException e) {
-          _log.error("Failed updating topic size : " + topic);
-          e.printStackTrace();
-          //throw new APIException("Set size failed for relation: " + topic);
+        if(messageCount > 0){
+          try {
+            String path = "/relations/" + topic + "/size";
+            _log.info("Sending message: " + params.toString() + " to path: " + path);
+            RestAPIHelper.post(path, params.toString(), API_AUTH_TOKEN);
+          } catch (APIException e) {
+            _log.error("Failed updating topic size : " + topic);
+            e.printStackTrace();
+            //throw new APIException("Set size failed for relation: " + topic);
+          }
         }
       }
       _activeSinkTopics.removeAll(removals);

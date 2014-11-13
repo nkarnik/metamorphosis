@@ -255,6 +255,9 @@ public class SchlossService {
           messages.add(new KeyedMessage<Integer,String>(workerSinkQ,queueMessage));  
         }
       }
+      // Add to active sink topics so size can be updated
+      _activeSinkTopics.add(topic);
+      
       //Create the producer for this distribution
       Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_brokers), "kafka.producer.DefaultPartitioner");
       Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
@@ -264,6 +267,7 @@ public class SchlossService {
 
     @Override
     public void handleTimeoutTasks() {
+      _log.info("Handling API Size update");
       // Every timeout, update row count of the active sinks
       List<String> removals = Lists.newArrayList();
       KafkaService kafkaService = Config.singleton().getOrException("kafka.service");

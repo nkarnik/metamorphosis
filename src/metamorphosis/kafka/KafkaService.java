@@ -2,11 +2,18 @@ package metamorphosis.kafka;
 
 import java.io.Serializable;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import kafka.admin.AdminUtils;
+import kafka.api.OffsetRequest;
+import kafka.api.PartitionMetadata;
+import kafka.api.PartitionOffsetRequestInfo;
 import kafka.api.TopicMetadata;
+import kafka.common.TopicAndPartition;
+import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.producer.Producer;
 import kafka.producer.ProducerConfig;
 import kafka.utils.TestUtils;
@@ -131,4 +138,44 @@ public class KafkaService implements Serializable{
       }
     }
   }
+  
+  /**
+   * Get number of messages in a topic
+   * @param topic
+   * @return
+   */
+  public long getTopicMessageCount(String topic){
+    
+    int timeout = 10000;
+    int bufferSize = 10 * 1000 * 1000;
+    String clientName = "topicMessageCounter";
+    long messageCount = 0;
+    TopicMetadata topicMetadata = getTopicMetadata(topic);
+    List<PartitionMetadata> partitionsMetadata = scala.collection.JavaConversions.seqAsJavaList(topicMetadata.partitionsMetadata());
+    Map<TopicAndPartition, PartitionOffsetRequestInfo> requestInfo  = new HashMap<TopicAndPartition, PartitionOffsetRequestInfo>();
+    int partition = 0;
+    
+    for(PartitionMetadata partitionMetadata : partitionsMetadata){
+      SimpleConsumer consumer = new SimpleConsumer(partitionMetadata.leader().get().host(), partitionMetadata.leader().get().port(), timeout, bufferSize, clientName);
+      // Get earliest offset
+      requestInfo.clear();
+      TopicAndPartition topicAndPartition = new TopicAndPartition(topic, partition);
+      requestInfo.put(topicAndPartition, new PartitionOffsetRequestInfo(OffsetRequest.EarliestTime(), 1));
+      kafka.javaapi.OffsetRequest request = new kafka.javaapi.OffsetRequest(requestInfo, kafka.api.OffsetRequest.CurrentVersion(), clientName);
+      long earlyOffset = consumer.getOffsetsBefore(request).offsets(topic, partition)[0];
+      
+      // Get latest offset
+      requestInfo.clear();
+      requestInfo.put(topicAndPartition, new PartitionOffsetRequestInfo(OffsetRequest.LatestTime(), 1));
+      request = new kafka.javaapi.OffsetRequest(requestInfo, kafka.api.OffsetRequest.CurrentVersion(), clientName);
+      long latestOffset = consumer.getOffsetsBefore(request).offsets(topic, partition)[0];
+      
+      
+      _log.info("Partition " + partition + "\t offsets: [" + earlyOffset + " - " + latestOffset + "]");
+      messageCount += (latestOffset - earlyOffset);
+      partition++;
+    }
+    return messageCount;
+  }
+
 }

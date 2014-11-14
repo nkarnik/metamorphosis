@@ -10,7 +10,6 @@ import java.util.zip.GZIPOutputStream;
 import kafka.consumer.ConsumerIterator;
 import kafka.consumer.ConsumerTimeoutException;
 import kafka.message.MessageAndMetadata;
-import metamorphosis.utils.ExponentialBackoffTicker;
 import metamorphosis.utils.KafkaUtils;
 import metamorphosis.utils.s3.S3Exception;
 import metamorphosis.utils.s3.S3Util;

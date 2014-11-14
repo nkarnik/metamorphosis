@@ -19,7 +19,6 @@ import kafka.serializer.StringDecoder;
 import kafka.server.KafkaServer;
 import kafka.utils.MockTime;
 import kafka.utils.TestUtils;
-import kafka.utils.TestZKUtils;
 import kafka.utils.VerifiableProperties;
 import kafka.utils.ZKStringSerializer$;
 import metamorphosis.utils.KafkaUtils;

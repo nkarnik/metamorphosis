@@ -150,8 +150,7 @@ public abstract class WorkerService<T extends Worker> {
   private ConsumerIterator<String, JSONObject> getMessageTopicIterator() {
     String clientName = "worker_service_consumer_" + _sourceTopic;
     Properties props = KafkaUtils.getDefaultProperties(_kafkaService.getZKConnectString("kafka"), clientName);
-    String consumerTimeout = Config.singleton().getOrException("kafka.consumer.timeout.ms");
-    props.put("consumer.timeout.ms", consumerTimeout);
+    props.put("consumer.timeout.ms", Config.singleton().<String>getOrException("kafka.consumer.timeout.ms"));
     ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(new ConsumerConfig(props));
 
     Map<String, Integer> topicCountMap = new HashMap<String, Integer>();

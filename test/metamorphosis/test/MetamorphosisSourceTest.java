@@ -48,9 +48,17 @@ public class MetamorphosisSourceTest {
   @Before
   public void setup(){
     new Config();
+    _localKakfaService = new LocalKafkaService(NUM_BROKERS);
+
+    initTopics();
+    initMetamorphosisConfig();
+    startServices();
+
+  }
+
+  private void initTopics() {
     _workerSourceQueues = Lists.newArrayList();
     _workerSinkQueues = Lists.newArrayList();
-    _localKakfaService = new LocalKafkaService(NUM_BROKERS);
     // Create required topics
     _localKakfaService.createTopic(SCHLOSS_SOURCE_QUEUE, 1, 1);
     _localKakfaService.createTopic(SCHLOSS_SINK_QUEUE, 1, 1);
@@ -61,7 +69,15 @@ public class MetamorphosisSourceTest {
       _localKakfaService.createTopic(PRODUCER_QUEUE_PREFIX + i, 1, 1);
       _localKakfaService.createTopic(CONSUMER_QUEUE_PREFIX + i, 1, 1);
     }
+  }
 
+  private void startServices() {
+    _schlossService = new SchlossService();
+    _workerSourceService = new  WorkerSourceService(_workerSourceQueues.get(0), _localKakfaService);
+    _workerSinkService = new  WorkerSinkService(_workerSinkQueues.get(0), _localKakfaService);
+  }
+
+  private void initMetamorphosisConfig() {
     Config.singleton().put("kafka.service", _localKakfaService);
     Config.singleton().put("kafka.consumer.timeout.ms", "1000");
     Config.singleton().put("kafka.zookeeper.connect", _localKakfaService.getZKConnectString() + "/kafka");
@@ -76,12 +92,6 @@ public class MetamorphosisSourceTest {
 
     Config.singleton().put("worker.source.queue", _workerSourceQueues.get(0));
     Config.singleton().put("worker.sink.queue", _workerSinkQueues.get(0));
-
-    
-    _schlossService = new SchlossService();
-    _workerSourceService = new  WorkerSourceService(_workerSourceQueues.get(0), _localKakfaService);
-    _workerSinkService = new  WorkerSinkService(_workerSinkQueues.get(0), _localKakfaService);
-
   }
   
   @After
@@ -137,7 +147,7 @@ public class MetamorphosisSourceTest {
     _log.info("Reading messages for confirmation for source phase");
     _log.info("");
     _log.info("");
-    int numMessages = _localKakfaService.readNumMessages(destinationTopic);
+    long numMessages = _localKakfaService.getTopicMessageCount(destinationTopic);
     _log.info("");
     _log.info("Total messages on producer queues: " + numMessages);   
     _log.info("");

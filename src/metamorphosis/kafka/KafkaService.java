@@ -171,7 +171,7 @@ public class KafkaService implements Serializable{
       long latestOffset = consumer.getOffsetsBefore(request).offsets(topic, partition)[0];
       
       
-      _log.info("Partition " + partition + "\t offsets: [" + earlyOffset + " - " + latestOffset + "]");
+      _log.debug("Partition " + partition + "\t offsets: [" + earlyOffset + " - " + latestOffset + "]");
       messageCount += (latestOffset - earlyOffset);
       partition++;
     }

@@ -1,16 +1,24 @@
 package metamorphosis.utils;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import kafka.cluster.Broker;
 import kafka.consumer.ConsumerConfig;
+import kafka.consumer.ConsumerIterator;
+import kafka.consumer.KafkaStream;
 import kafka.javaapi.PartitionMetadata;
 import kafka.javaapi.TopicMetadata;
 import kafka.javaapi.TopicMetadataRequest;
 import kafka.javaapi.TopicMetadataResponse;
+import kafka.javaapi.consumer.ConsumerConnector;
 import kafka.javaapi.consumer.SimpleConsumer;
+import kafka.serializer.Decoder;
+import kafka.serializer.StringDecoder;
+import kafka.utils.VerifiableProperties;
 import metamorphosis.kafka.KafkaService;
 
 import org.apache.curator.framework.CuratorFramework;
@@ -116,5 +124,25 @@ public class KafkaUtils {
     }
     _log.debug("Done with zk check...");
     return done;
+  }
+  
+  public static <O, T extends Decoder<O>> ConsumerIterator<String, O> getIterator(String messageTopic, T decoder, String clientPrefix) {
+    String clientName = clientPrefix + messageTopic;
+    String zkConnectString = Config.singleton().getOrException("kafka.zookeeper.connect");
+    Properties props = KafkaUtils.getDefaultProperties(zkConnectString, clientName);
+    props.put("consumer.timeout.ms", Config.singleton().<String>getOrException("kafka.consumer.timeout.ms"));
+
+    ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(new ConsumerConfig(props));
+
+    Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
+    topicCountMap.put(messageTopic, new Integer(1)); // This consumer will only have one thread
+    StringDecoder stringDecoder = new StringDecoder(new VerifiableProperties());
+    KafkaStream<String,O> kafkaStream = consumer.createMessageStreams(topicCountMap, stringDecoder, decoder).get(messageTopic).get(0);
+    ConsumerIterator<String, O> iterator = kafkaStream.iterator();
+    _log.info("Consumer " + clientName + " instantiated with properties: ");
+    _log.info("");
+    _log.info(props);
+    _log.info("");
+    return iterator;
   }
 }

@@ -21,6 +21,8 @@ public class SchlossS3Source extends SchlossSource{
   public String _bucketName;
   private String _sourceType;
   private String _topicToWrite;
+  
+  @Deprecated
   private String _manifestPath;
   private List<String> _workerMessages;
   
@@ -41,6 +43,7 @@ public class SchlossS3Source extends SchlossSource{
   public List<String> getWorkerMessages() {
     _workerMessages = Lists.newArrayList();
     try {
+      //TODO: Generate manifest here.
       _log.info("Getting worker messages. Reading s3 manifest: " + _manifestPath);
       String[] split = S3Util.readFile(_bucketName, _manifestPath).split("\n");
       _log.info("Manifest length: " + split.length);

@@ -18,17 +18,17 @@ import org.apache.log4j.Logger;
 
 import com.google.common.collect.Lists;
 
-public abstract class SchlossReadThread<T extends SchlossDistributor> implements Callable<Void> {
+public abstract class SchlossReadThread<T extends SchlossHandler> implements Callable<Void> {
   protected static final String API_AUTH_TOKEN = "__zilla_web_of_trust__643eb89103d9490fb3cbc98c06f87dea7e6df97e4ab33cee1221f0f0169cae362305879837b841ef5f2ecab1381db72e0259";
 
   private String[] _workerQueues;
   private String _messageQueue;
-  private SchlossFactory<T> _factory;
+  private SchlossHandlerFactory<T> _factory;
   private ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(100);
   private Logger _log = Logger.getLogger(SchlossService.class);
   protected ArrayList<String> _brokers;
 
-  public SchlossReadThread(String messageTopic, String targetWorkerQueues, SchlossFactory<T> factory){
+  public SchlossReadThread(String messageTopic, String targetWorkerQueues, SchlossHandlerFactory<T> factory){
     String workerQueuesString = Config.singleton().getOrException(targetWorkerQueues);
     _workerQueues = workerQueuesString.split(",");
     _messageQueue = messageTopic;
@@ -57,12 +57,13 @@ public abstract class SchlossReadThread<T extends SchlossDistributor> implements
           _log.info("Processing message: " + message.toString());
           KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
           if(kafkaService.hasTopic(topic)){
-            // Do nothing
+              // Do nothing
           }else{
             // Create topic with default settings
             kafkaService.createTopic(topic, 20, 1); 
           }
-          SchlossDistributor schlossHandler = _factory.createSchlossDistributor(message);
+          // Schloss is basically a distributor. Each message has a distributor that get's the worker messages
+          SchlossHandler schlossHandler = _factory.createSchlossHandler(message);
           List<String> workerQueueMessages = schlossHandler.getWorkerMessages();
           distributeMessagesToQueues(_workerQueues, workerQueueMessages, topic);
 
@@ -78,7 +79,7 @@ public abstract class SchlossReadThread<T extends SchlossDistributor> implements
 
       handleTimeoutTasks();
 
-    }while(SchlossService.isRunning.get());
+    }while(SchlossService.isRunning.get()); // Piggyback off of the same boolean, for convenience.
     _log.info("Done with the schloss service loop");
     return null;
   }

@@ -35,7 +35,7 @@ public class SchlossSinkService extends SchlossReadThread<SchlossSink>{
   @Override
   public void distributeMessagesToQueues(String[] workerQueues, List<String> workerQueueMessages, String topic) {
     // Write to all topics.
-    _log.info("Schloss Sink distributing " + workerQueueMessages.size() + " messages to " + workerQueues.length + " queues" );
+    _log.info("Schloss Sink sending " + workerQueueMessages.size() + " messages to all " + workerQueues.length + " queues" );
     List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
     for(String workerSinkQ: workerQueues){
       for(String queueMessage : workerQueueMessages){

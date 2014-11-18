@@ -78,13 +78,15 @@ public class RestAPIHelper {
   
   public static JSONObject post(String path, String body, String authToken) throws APIException {
     Client client = Client.create();
+    client.setConnectTimeout(5 * 1000); // 5 seconds to respond??
+
     String url = "http://" + getHost() + ":" + getPort() + path;
 
     log.info("post: " + url + " body: " + body);
-
+    
     WebResource webResource = client.resource(url);
     ClientResponse response;
-    
+
     int retries = -1;
     do {
       retries++; 

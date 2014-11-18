@@ -1,7 +1,7 @@
 package metamorphosis.schloss.sinks;
 
-import metamorphosis.schloss.SchlossDistributor;
+import metamorphosis.schloss.SchlossHandler;
 
-public abstract class SchlossSink implements SchlossDistributor{
+public abstract class SchlossSink extends SchlossHandler{
 
 }

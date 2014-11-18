@@ -25,7 +25,7 @@ public class SchlossService {
 
   public SchlossService() {
 
-    //This is heere 
+    //This is here to enforce that these configs are set at startup. Should throw exception and die if they are not. 
     Config.singleton().getOrException("kafka.brokers");
     Config.singleton().getOrException("kafka.zookeeper.connect");
     _sourceTopic = Config.singleton().getOrException("schloss.source.queue");

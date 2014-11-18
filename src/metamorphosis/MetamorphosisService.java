@@ -181,6 +181,8 @@ public class MetamorphosisService {
       break;
     }
     Config.singleton().put("api.host", apiHost);
+    int apiPort = 80;
+    Config.singleton().put("api.port", apiPort );
     Config.singleton().put("kafka.consumer.timeout.ms", options.getOptionValue("kafka.consumer.timeout.ms"));
     String service = options.getOptionValue("service");
 

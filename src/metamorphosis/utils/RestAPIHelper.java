@@ -27,7 +27,7 @@ public class RestAPIHelper {
   }
   
   public static int getPort() {
-    return Config.getOrDefault("api.port", 5000);
+    return Config.getOrDefault("api.port", 80);
   }
 
   public static JSONObject get(String path, String authToken) throws APIException {
@@ -78,7 +78,7 @@ public class RestAPIHelper {
   
   public static JSONObject post(String path, String body, String authToken) throws APIException {
     Client client = Client.create();
-    String url = "http://" + getHost() + path;
+    String url = "http://" + getHost() + ":" + getPort() + path;
 
     log.info("post: " + url + " body: " + body);
 

@@ -92,6 +92,7 @@ public class MetamorphosisSourceTest {
 
     Config.singleton().put("worker.source.queue", _workerSourceQueues.get(0));
     Config.singleton().put("worker.sink.queue", _workerSinkQueues.get(0));
+    Config.singleton().put("api.port", 5000);
   }
   
   @After

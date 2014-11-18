@@ -169,6 +169,17 @@
 			<artifactId>jersey-client</artifactId>
 			<version>1.18.2</version>
 		</dependency>
+    <dependency>
+      <groupId>org.elasticsearch</groupId>
+      <artifactId>elasticsearch</artifactId>
+      <version>1.4.0</version>
+    </dependency>
+		<dependency>
+			<groupId>org.elasticsearch</groupId>
+			<artifactId>elasticsearch</artifactId>
+			<version>1.4.0</version>
+			<classifier>tests</classifier>
+		</dependency>
 	</dependencies>
 	<build>
 		<resources>

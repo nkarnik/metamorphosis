@@ -19,6 +19,9 @@ public class WorkerSinkFactory implements WorkerFactory<WorkerSink> {
     case "kinesis":
       
       break;
+    case "elasticsearch":
+      workerSink = new WorkerElasticsearchSink(message);
+      break;
      default:
       throw new NotImplementedException("Cannot handle source of type: " + type); 
 

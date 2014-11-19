@@ -12,6 +12,7 @@ import metamorphosis.utils.Config;
 import metamorphosis.utils.ExponentialBackoffTicker;
 import metamorphosis.utils.JSONDecoder;
 import metamorphosis.utils.KafkaUtils;
+import metamorphosis.utils.Utils;
 import net.sf.json.JSONObject;
 
 import org.apache.log4j.Logger;
@@ -60,7 +61,8 @@ public abstract class SchlossReadThread<T extends SchlossHandler> implements Cal
               // Do nothing
           }else{
             // Create topic with default settings
-            kafkaService.createTopic(topic, 20, 1); 
+            kafkaService.createTopic(topic, 20, 1);
+            Utils.sleep(15 * 1000); // For safety. Maybe the size check or workers acting immediately after is causing issues?
           }
           // Schloss is basically a distributor. Each message has a distributor that get's the worker messages
           SchlossHandler schlossHandler = _factory.createSchlossHandler(message);

@@ -1,4 +1,4 @@
-package metamorphosis.workers.test;
+package metamorphosis.workers.sinks.test;
 
 import static org.junit.Assert.assertEquals;
 
@@ -21,6 +21,7 @@ import net.sf.json.util.JSONStringer;
 import org.apache.log4j.Logger;
 import org.jets3t.service.S3ServiceException;
 import org.jets3t.service.model.S3Object;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -34,7 +35,7 @@ public class WorkerSinkServiceTest {
   private LocalKafkaService _localKakfaService;
   private String CONSUMER_QUEUE_PREFIX = "consumer_queue_";
   private int NUM_BROKERS = 3;
-  private Logger _log = Logger.getLogger(WorkerSourceServiceTest.class);
+  private Logger _log = Logger.getLogger(WorkerSinkServiceTest.class);
   private String TOPIC_TO_SINK = "single_worker_sink";
 
   @Before
@@ -70,6 +71,11 @@ public class WorkerSinkServiceTest {
     _log.info("Test data added");
   }
 
+  @After
+  public void teardown(){
+    _localKakfaService.shutDown();
+  }
+  
   @Test
   public void testSingleWorkerS3Sink() throws InterruptedException, ExecutionException, S3ServiceException, S3Exception, IOException{
     

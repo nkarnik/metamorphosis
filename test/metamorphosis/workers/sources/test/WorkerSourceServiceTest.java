@@ -1,4 +1,4 @@
-package metamorphosis.workers.test;
+package metamorphosis.workers.sources.test;
 
 import static org.junit.Assert.assertEquals;
 
@@ -13,6 +13,7 @@ import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;
 
 import org.apache.log4j.Logger;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -39,6 +40,11 @@ public class WorkerSourceServiceTest {
     }
     _localKakfaService.createTopic(DESTINATION_TOPIC, 1, 1);
 
+  }
+  
+  @After
+  public void teardown(){
+    _localKakfaService.shutDown();
   }
 
   @Test

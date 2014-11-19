@@ -81,7 +81,7 @@ public class SchlossSinkService extends SchlossReadThread<SchlossSink>{
       if(messageCount > 0){
         try {
           String path = "/relations/" + topic + "/size";
-          _log.info("Sending message: " + params.toString() + " to path: " + path);
+          _log.debug("Sending message: " + params.toString() + " to path: " + path);
           RestAPIHelper.post(path, params.toString(), API_AUTH_TOKEN);
         } catch (APIException e) {
           _log.error("Failed updating topic size : " + topic);

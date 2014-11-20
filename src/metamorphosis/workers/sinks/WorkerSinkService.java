@@ -98,7 +98,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       _log.debug("New consumer created: " + _consumer.hashCode());
       
       Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
-      topicCountMap.put(clientName, new Integer(1)); // This consumer will only have one thread
+      topicCountMap.put(topic, new Integer(1)); // This consumer will only have one thread
       StringDecoder stringDecoder = new StringDecoder(new VerifiableProperties());
       
       sinkTopicIterator = _consumer.createMessageStreams(topicCountMap, stringDecoder, stringDecoder).get(topic).get(0).iterator();

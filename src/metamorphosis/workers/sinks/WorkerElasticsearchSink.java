@@ -39,7 +39,8 @@ public class WorkerElasticsearchSink extends WorkerSink {
 
   @Override
   public void sink(ConsumerIterator<String, String> sinkTopicIterator, int queueNumber) {
-    
+    _log.info("Entering elasticsearch sink for topic: " + _topic);
+    int sunk = 0;
     try{
       while (sinkTopicIterator.hasNext()) {
         MessageAndMetadata<String, String> fetchedMessage = sinkTopicIterator.next();
@@ -50,10 +51,12 @@ public class WorkerElasticsearchSink extends WorkerSink {
             .actionGet();
 
         _log.debug("Elasticsearch returned : " + response.getId());
+        sunk++;
       }
     }catch(ConsumerTimeoutException e){
       _log.info("Consumer timed out. ");  
     }
+    _log.info("Exiting elasticsearch sink for topic: " + _topic + " after sinking " + sunk + " tuples");
     
   }
 

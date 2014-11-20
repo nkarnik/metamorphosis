@@ -45,6 +45,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
   protected void processMessage(JSONObject poppedMessage) {
     WorkerSink workerSink = _workerFactory.createWorker(poppedMessage);
     String topic = poppedMessage.getString("topic");
+    String type = poppedMessage.getJSONObject("sink").getString("type");
     boolean done = false;
     //Do we really want to process this message? Look for the done message in zk.
     _log.debug("Performing zk check...");
@@ -81,11 +82,13 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       }
     }
     _log.debug("Done with zk check...");
-    String clientName = topic;
+    String clientName = topic + "_" + type;
+
     ConsumerIterator<String, String> sinkTopicIterator;
-    if(_topicToIteratorCache.containsKey(topic)){
-      _log.debug("Using cached iterator for topic: " + topic);
-      sinkTopicIterator = _topicToIteratorCache.get(topic);
+    if(_topicToIteratorCache.containsKey(clientName)){
+      
+      _log.debug("Using cached iterator for topic: " + clientName);
+      sinkTopicIterator = _topicToIteratorCache.get(clientName);
       // TODO: Maybe the iterator is in a bad state? Confirm before proceeding
 
     }else{
@@ -95,7 +98,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       _log.debug("New consumer created: " + _consumer.hashCode());
       
       Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
-      topicCountMap.put(topic, new Integer(1)); // This consumer will only have one thread
+      topicCountMap.put(clientName, new Integer(1)); // This consumer will only have one thread
       StringDecoder stringDecoder = new StringDecoder(new VerifiableProperties());
       
       sinkTopicIterator = _consumer.createMessageStreams(topicCountMap, stringDecoder, stringDecoder).get(topic).get(0).iterator();

@@ -40,7 +40,7 @@ import com.google.common.io.Files;
 public class WorkerElasticsearchSinkTest {
 
 
-  private static final int BATCHES = 100;
+  private static final int BATCHES = 1000;
   private static final int PER_BATCH = 10;
   private ArrayList<String> _workerQueues;
   private LocalKafkaService _localKakfaService;

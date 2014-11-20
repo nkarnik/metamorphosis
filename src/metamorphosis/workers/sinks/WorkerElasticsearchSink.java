@@ -10,6 +10,9 @@ import metamorphosis.utils.Config;
 import net.sf.json.JSONObject;
 
 import org.apache.log4j.Logger;
+import org.elasticsearch.action.bulk.BulkItemResponse;
+import org.elasticsearch.action.bulk.BulkRequestBuilder;
+import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.ImmutableSettings;
@@ -45,23 +48,40 @@ public class WorkerElasticsearchSink extends WorkerSink {
   public void sink(ConsumerIterator<String, String> sinkTopicIterator, int queueNumber) {
     _log.info("Entering elasticsearch sink for topic: " + _topic);
     int sunk = 0;
+    BulkRequestBuilder prepareBulk = _client.prepareBulk();
     try{
       while (sinkTopicIterator.hasNext()) {
         MessageAndMetadata<String, String> fetchedMessage = sinkTopicIterator.next();
         String messageBody = fetchedMessage.message();
-        IndexResponse response = _client.prepareIndex(_topic, "tuple")
-            .setSource(messageBody)
-            .execute()
-            .actionGet();
-
-        _log.debug("Elasticsearch returned : " + response.getId());
+        
+        prepareBulk.add(_client.prepareIndex(_topic, "tuple")
+            .setSource(messageBody));
         sunk++;
+        if(sunk == 100){
+          flush(prepareBulk);
+          sunk = 0;
+          prepareBulk = _client.prepareBulk(); // Start new bulk sender
+        }
       }
     }catch(ConsumerTimeoutException e){
       _log.info("Consumer timed out. ");  
+      flush(prepareBulk);
     }
     _log.info("Exiting elasticsearch sink for topic: " + _topic + " after sinking " + sunk + " tuples");
     
+  }
+
+  private void flush(BulkRequestBuilder prepareBulk) {
+    _log.info("Flushing " + prepareBulk.numberOfActions() + " requests to elasticsearch");
+    BulkResponse actionGet = prepareBulk.execute().actionGet();
+    if(actionGet.hasFailures()){
+      _log.error("Error while flushing to elasticsearch: ");
+      for( BulkItemResponse response : actionGet.getItems()){
+        if(response.isFailed()){
+          _log.error("Failed: " + response.getFailureMessage());
+        }
+      }
+    }
   }
 
 }

@@ -25,7 +25,8 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 
 public class WorkerSourceService extends WorkerService<WorkerSource> {
-
+  
+  private static int MAX_MESSAGE_LENGTH = 100000;
   private Logger _log = Logger.getLogger(WorkerSourceService.class);
   
   public WorkerSourceService(String sourceTopic, KafkaService kafkaService) {
@@ -127,15 +128,22 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
       int bytesReceived = 0;
       try{
         for( String workerQueueMessage : messageIterator) {
+          int messageLength = workerQueueMessage.getBytes().length;
+
+          if(messageLength >=  MAX_MESSAGE_LENGTH){
+            _log.error("Tuple too large, skipping: " + workerQueueMessage.substring(0,20) + "...");
+            continue;
+          }
           //_log.info("Sending message " + workerQueueMessage + " to queue: " + topic);
           List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
-          bytesReceived += workerQueueMessage.getBytes().length;
+          bytesReceived += messageLength;
           messages.add(new KeyedMessage<Integer,String>(topicQueue,workerQueueMessage));
+          
           try{
             producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
             msgsSent++;
           }catch(kafka.common.FailedToSendMessageException e){
-            _log.info("Failed to send. Message too large? " + workerQueueMessage.getBytes().length);
+            _log.error("Failed to send. " + e.getMessage());
           }
         }
         

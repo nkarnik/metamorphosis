@@ -45,7 +45,7 @@ puts "List of brokers found: #{kafka_brokers.join(',')}"
 kafka_brokers_hosts_string = kafka_brokers.map{|b| b + ":#{DEFAULT_KAFKA_PORT}"}.join(',')
 kafka_zookeeper = find_nodes(env, "kafka_zookeeper").first()
 
-elasticsearch_nodes = find_nodes(env, "elasticsearch").join(",")
+elasticsearch_nodes = find_nodes(env, "elasticsearch").map{|a| a.gsub(".ec2.internal", "").gsub("ip-", "").gsub("-",".")}.join(",")
 puts "List of elasticsearch nodes found: #{elasticsearch_nodes}"
 
 case service

@@ -29,9 +29,12 @@ public class WorkerElasticsearchSink extends WorkerSink {
     String hostsString = Config.singleton().getOrException("elasticsearch.hosts");
     String[] hosts = hostsString.split(",");
     Settings settings = ImmutableSettings.settingsBuilder()
-        .put("client.transport.sniff", true).build();
+                          .put("client.transport.sniff", true)
+                          .build();
     _client = new TransportClient(settings);
+    _log.info("Elasticsearch hosts are: " + hostsString + " Count: " + hosts.length);
     for(String host : hosts){
+      _log.info("Adding host: " + host);
       _client.addTransportAddress(new InetSocketTransportAddress(host, 9200)); // Default port
     }
     _topic = message.getString("topic");

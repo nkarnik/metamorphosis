@@ -35,8 +35,9 @@ public class WorkerElasticsearchSink extends WorkerSink {
     _log.info("Elasticsearch hosts are: " + hostsString + " Count: " + hosts.length);
     for(String host : hosts){
       _log.info("Adding host: " + host);
-      _client.addTransportAddress(new InetSocketTransportAddress(host, 9200)); // Default port
+      _client.addTransportAddress(new InetSocketTransportAddress(host, 9300)); // Default port
     }
+    _log.info("Total added hosts: " + _client.transportAddresses().size());
     _topic = message.getString("topic");
   }
 

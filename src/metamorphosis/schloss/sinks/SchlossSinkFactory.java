@@ -15,6 +15,9 @@ public class SchlossSinkFactory implements SchlossHandlerFactory<SchlossSink>{
     case "s3":
       schlossSink = new SchlossS3Sink(message);
       break;
+    case "elasticsearch":
+      schlossSink = new SchlossElasticsearchSink(message);
+      break;
     case "kinesis":
       
       break;

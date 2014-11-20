@@ -1,8 +1,7 @@
 package metamorphosis.workers.sinks.test;
 
+import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 import static org.elasticsearch.node.NodeBuilder.nodeBuilder;
-import static org.elasticsearch.index.query.FilterBuilders.*;
-import static org.elasticsearch.index.query.QueryBuilders.*;
 import static org.junit.Assert.assertEquals;
 
 import java.io.File;
@@ -28,7 +27,6 @@ import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
-import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.node.Node;
 import org.jets3t.service.S3ServiceException;
 import org.junit.After;

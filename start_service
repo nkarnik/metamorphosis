@@ -42,10 +42,11 @@ env = `grep "^node_name " /etc/chef/client.rb`.split(" ").last.gsub('"',"").spli
 
 kafka_brokers = find_nodes(env, "kafka_broker")
 puts "List of brokers found: #{kafka_brokers.join(',')}"
-
 kafka_brokers_hosts_string = kafka_brokers.map{|b| b + ":#{DEFAULT_KAFKA_PORT}"}.join(',')
 kafka_zookeeper = find_nodes(env, "kafka_zookeeper").first()
 
+elasticsearch_nodes = find_nodes(env, "elasticsearch").join(",")
+puts "List of elasticsearch nodes found: #{elasticsearch_nodes}"
 
 case service
 when "schloss"
@@ -92,6 +93,7 @@ metamorphosis.MetamorphosisService\
  --kafka.brokers #{kafka_brokers_hosts_string}\
  --kafka.zookeeper.host #{kafka_zookeeper}\
  --kafka.consumer.timeout.ms #{kafka_consumer_timeout}\
+ --elasticsearch.hosts #{elasticsearch_nodes}\
  --service #{service}\
  #{service_args}\"
 CMD

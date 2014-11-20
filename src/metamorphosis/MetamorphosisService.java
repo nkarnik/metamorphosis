@@ -168,6 +168,8 @@ public class MetamorphosisService {
     Config.singleton().put("kafka.zookeeper.port", zkPort);
     Config.singleton().put("kafka.zookeeper.connect", zkHost + ":" + zkPort + "/kafka");
     Config.singleton().put("gmb.zookeeper.connect", zkHost + ":" + zkPort + "/gmb");
+    Config.singleton().put("elasticsearch.hosts", options.getOptionValue("elasticsearch.hosts"));
+    
     String apiHost;
     switch(env){
     case "test":

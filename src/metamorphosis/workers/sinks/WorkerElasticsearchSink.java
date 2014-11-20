@@ -32,7 +32,7 @@ public class WorkerElasticsearchSink extends WorkerSink {
         .put("client.transport.sniff", true).build();
     _client = new TransportClient(settings);
     for(String host : hosts){
-      _client.addTransportAddress(new InetSocketTransportAddress(host, 9300)); // Default port
+      _client.addTransportAddress(new InetSocketTransportAddress(host, 9200)); // Default port
     }
     _topic = message.getString("topic");
   }

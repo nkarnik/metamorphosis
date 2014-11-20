@@ -95,6 +95,13 @@ public class MetamorphosisService {
     
     availOptions.addOption(OptionBuilder
         .hasArg()
+        .withLongOpt("elasticsearch.hosts")
+        .withType(String.class)
+        .create()
+        );
+    
+    availOptions.addOption(OptionBuilder
+        .hasArg()
         .withLongOpt(schlossSinkQueue)
         .withType(String.class)
         .create()

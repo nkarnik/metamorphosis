@@ -21,7 +21,8 @@ public class SchlossS3Source extends SchlossSource{
   private JSONObject _message;
   private Logger _log = Logger.getLogger(SchlossS3Source.class);
   private String _bucketName;
-  private String _pathPrefix;
+  private String _shardPath;
+  private String _shardPrefix;
   private String _sourceType;
   private String _topicToWrite;
 
@@ -35,7 +36,9 @@ public class SchlossS3Source extends SchlossSource{
     _sourceType = sourceObject.getString("type");
     JSONObject config = sourceObject.getJSONObject("config");
     _bucketName = config.getString("bucket");
-    _pathPrefix = config.getString("bucket");
+    _shardPath = config.getString("shard_path");
+    _shardPrefix = config.getString("shard_prefix");
+    
     
   }
 
@@ -45,15 +48,19 @@ public class SchlossS3Source extends SchlossSource{
     _workerMessages = Lists.newArrayList();
     try {
 
-      _log.info("Getting worker messages. Reading shard list from bucket: " + _bucketName + " pathPrefix: " + _pathPrefix);
+      _log.info("Getting worker messages. Reading shard list from bucket: " + _bucketName + " pathPrefix: " + _shardPath);
 //      String[] split = S3Util.readFile(_bucketName, _manifestPath).split("\n");
-      S3Object[] s3Objects = S3Util.listPath(_bucketName, _pathPrefix);
+      S3Object[] s3Objects = S3Util.listPath(_bucketName, _shardPath);
       
       _log.info("Found shards: " + s3Objects.length);
       for(S3Object s3Object : s3Objects){
 
         String path = s3Object.getKey();
-     
+        
+        if(!path.contains(_shardPrefix)){
+          continue; //hack check for the file prefix
+        }
+        
         //Build JSON to send as message
         JSONBuilder builder = new JSONStringer();
         builder.object()
@@ -77,7 +84,7 @@ public class SchlossS3Source extends SchlossSource{
       }
 
     } catch (S3ServiceException e) {
-      _log.info("Failed to list path with bucket: " + _bucketName + " pathPrefix: " + _pathPrefix);
+      _log.info("Failed to list path with bucket: " + _bucketName + " pathPrefix: " + _shardPath);
     }
     // TODO Auto-generated method stub
     return _workerMessages;

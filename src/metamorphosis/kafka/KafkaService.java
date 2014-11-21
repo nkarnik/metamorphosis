@@ -132,7 +132,7 @@ public class KafkaService implements Serializable{
   public void ensureQueuesExist(String... queues) {
     for(String queue : queues){
       if(!hasTopic(queue)){
-        createTopic(queue, 1, 1);
+        createTopic(queue, 1, 2);
       }else{
         _log.info("Topic " + queue + " already exists, nothing to do.");
       }

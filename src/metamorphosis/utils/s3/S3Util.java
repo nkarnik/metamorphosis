@@ -108,7 +108,7 @@ public class S3Util {
   
   public static S3Object[] listPath(String bucket, String key) throws S3ServiceException {
     RestS3Service s3Service = new RestS3Service(AWS_CREDENTIALS);
-    return s3Service.listObjects(bucket, key, null, 10000);
+    return s3Service.listObjects(bucket, key, null, 100000);
     
   }
   
@@ -375,35 +375,12 @@ public class S3Util {
     }
 
   }
-  public static void main(String[] args) throws S3Exception {
-    System.out.println("Running");
-    String cmd = "ZILLABYTE_API_KEY=__zilla_web_of_trust__643eb89103d9490fb3cbc98c06f87dea7e6df97e4ab33cee1221f0f0169cae362305879837b841ef5f2ecab1381db72e0259 ZILLABYTE_API_HOST=192.168.111.1 ZILLABYTE_API_PORT=5000 zillabyte query:pull:s3 \"SELECT  *   FROM  r0012__web_pages  \" AKIAJWZ2I3PMFF5O6PFA F9rmZ36zlk2rNNRunsbYQh53+OF6rPdzy6HtI6bf files.zillabyte.com dev-sashi/queries/8c686b0c65f8e2ef69542e3f2395ee79_1394765575094";
-    ProcessBuilder pb = new ProcessBuilder("/bin/bash","-c","-l", cmd);
-    try {
-      pb.start().waitFor();
-    } catch (InterruptedException e) {
-      throw new S3Exception("Unload to s3 was interrupted", e);
-    } catch (IOException e) {
-      throw new S3Exception("Unload to s3 had an IOException", e);
-    }
-    
-//    String _bucket = "files.zillabyte.com";j
-//    String _key = "test/queries/sashi_test/0000_part_00.gz";
-//    
-//    BufferedReader cachedGzipFileReader = S3Util.getCachedGzipFileReader(_bucket, _key);
-//    String line;
-//    
-//    while((line = cachedGzipFileReader.readLine()) != null){
-//      
-//      String[] values = line.split("\",\""); //Contains field values and metatuple columns
-//      //Remove quotes on first and last values.
-//      values[0] = values[0].substring(1);
-//      String last = values[values.length - 1];
-//      values[values.length - 1] = last.substring(0, last.length() - 1);
-//
-//      System.out.println(values.length + " Values: " + Joiner.on(",").join(values));
-//      
-//    }
+  public static void main(String[] args) throws S3Exception, S3ServiceException {
+    long t = System.currentTimeMillis();
+    S3Object[] s3Objects = S3Util.listPath("fatty.zillabyte.com", "data/homepages/2014/0620/");
+    System.out.println("Found shards: " + s3Objects.length + " in " + (System.currentTimeMillis() - t) / 1000 + " seconds");
+    System.out.println("First key: " + s3Objects[0].getKey());
+    // Found shards: 34498 in 40 seconds
 
   }
 
@@ -452,9 +429,5 @@ public class S3Util {
   public static void deleteFile(S3Object o) throws S3Exception {
     deleteFile(o.getBucketName(), o.getKey());
   }
-
-
-
-
 
 }

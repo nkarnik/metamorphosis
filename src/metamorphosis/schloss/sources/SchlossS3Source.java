@@ -11,6 +11,8 @@ import net.sf.json.util.JSONStringer;
 
 import org.apache.log4j.Logger;
 import org.javatuples.Pair;
+import org.jets3t.service.S3ServiceException;
+import org.jets3t.service.model.S3Object;
 
 import com.google.common.collect.Lists;
 
@@ -18,23 +20,22 @@ public class SchlossS3Source extends SchlossSource{
 
   private JSONObject _message;
   private Logger _log = Logger.getLogger(SchlossS3Source.class);
-  public String _bucketName;
+  private String _bucketName;
+  private String _pathPrefix;
   private String _sourceType;
   private String _topicToWrite;
-  
-  @Deprecated
-  private String _manifestPath;
+
   private List<String> _workerMessages;
   
   
   public SchlossS3Source(JSONObject message) {
     _message = message;
+    _topicToWrite = message.getString("topic");
     JSONObject sourceObject = _message.getJSONObject("source");
+    _sourceType = sourceObject.getString("type");
     JSONObject config = sourceObject.getJSONObject("config");
     _bucketName = config.getString("bucket");
-    _manifestPath = config.getString("manifest");
-    _topicToWrite = message.getString("topic");
-    _sourceType = sourceObject.getString("type");
+    _pathPrefix = config.getString("bucket");
     
   }
 
@@ -43,15 +44,15 @@ public class SchlossS3Source extends SchlossSource{
   public List<String> getWorkerMessages() {
     _workerMessages = Lists.newArrayList();
     try {
-      //TODO: Generate manifest here.
-      _log.info("Getting worker messages. Reading s3 manifest: " + _manifestPath);
-      String[] split = S3Util.readFile(_bucketName, _manifestPath).split("\n");
-      _log.info("Manifest length: " + split.length);
-      for(String line : split){
-        
-        Pair<String, String> decomposedPath = S3Util.decomposePath(line);
-        String path = decomposedPath.getValue1();
-        _log.debug("Path from decomposed is: " + path);
+
+      _log.info("Getting worker messages. Reading shard list from bucket: " + _bucketName + " pathPrefix: " + _pathPrefix);
+//      String[] split = S3Util.readFile(_bucketName, _manifestPath).split("\n");
+      S3Object[] s3Objects = S3Util.listPath(_bucketName, _pathPrefix);
+      
+      _log.info("Found shards: " + s3Objects.length);
+      for(S3Object s3Object : s3Objects){
+
+        String path = s3Object.getKey();
      
         //Build JSON to send as message
         JSONBuilder builder = new JSONStringer();
@@ -75,8 +76,8 @@ public class SchlossS3Source extends SchlossSource{
         _workerMessages.add(workerMessage);
       }
 
-    } catch (IOException | S3Exception e) {
-      _log.info("Failed to get s3 manifest path: " + _manifestPath);
+    } catch (S3ServiceException e) {
+      _log.info("Failed to list path with bucket: " + _bucketName + " pathPrefix: " + _pathPrefix);
     }
     // TODO Auto-generated method stub
     return _workerMessages;

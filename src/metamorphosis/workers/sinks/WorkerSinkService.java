@@ -112,7 +112,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       //streaming sink, so have to increment retry and push back to worker queue
       int retry = poppedMessage.getJSONObject("sink").getInt("retry") + 1;
       
-      if(retry > 300){
+      if(retry > 1000){ // Allow for long running flows
         _log.info("Max retries reached. Stopping sink! Topic: " + topic);
         done = true;
       }else{

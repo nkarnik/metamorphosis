@@ -106,7 +106,8 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       _topicToIteratorCache.put(clientName,sinkTopicIterator);
     }
 
-    workerSink.sink(sinkTopicIterator, _queueNumber);
+    int sunkTuples = workerSink.sink(sinkTopicIterator, _queueNumber);
+    _log.info("Sunk #" + sunkTuples + " tuples for topic: " + topic);
     
     if(!done){
       //streaming sink, so have to increment retry and push back to worker queue
@@ -122,7 +123,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
         Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_kafkaService.getSeedBrokers()), "kafka.producer.DefaultPartitioner");
         Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
         producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
-        _log.info("Retry #" + retry + ". Sent message to topic: " + _sourceTopic  + " :: "+ poppedMessage.toString() );
+        _log.info("Retry #" + retry + ". topic: " + topic);
         producer.close(); 
       }
     }

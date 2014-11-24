@@ -22,8 +22,13 @@ public abstract class WorkerSink implements Worker {
   }
 
 
-
-  public abstract void sink(ConsumerIterator<String, String> sinkTopicIterator, int queueNumber);
+  /**
+   * Respond with number of tuples successfully flushed 
+   * @param sinkTopicIterator
+   * @param queueNumber
+   * @return
+   */
+  public abstract int sink(ConsumerIterator<String, String> sinkTopicIterator, int queueNumber);
 
 
 

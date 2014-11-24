@@ -45,9 +45,9 @@ public class WorkerElasticsearchSink extends WorkerSink {
   }
 
   @Override
-  public void sink(ConsumerIterator<String, String> sinkTopicIterator, int queueNumber) {
+  public int sink(ConsumerIterator<String, String> sinkTopicIterator, int queueNumber) {
     _log.info("Entering elasticsearch sink for topic: " + _topic);
-    int sunk = 0;
+    int sunkTuples = 0;
     BulkRequestBuilder prepareBulk = _client.prepareBulk();
     try{
       while (sinkTopicIterator.hasNext()) {
@@ -56,10 +56,10 @@ public class WorkerElasticsearchSink extends WorkerSink {
         
         prepareBulk.add(_client.prepareIndex(_topic, "tuple")
             .setSource(messageBody));
-        sunk++;
-        if(sunk == 100){
+        sunkTuples++;
+        if(sunkTuples == 100){
           flush(prepareBulk);
-          sunk = 0;
+          sunkTuples = 0;
           prepareBulk = _client.prepareBulk(); // Start new bulk sender
         }
       }
@@ -67,8 +67,8 @@ public class WorkerElasticsearchSink extends WorkerSink {
       _log.info("Consumer timed out. ");  
       flush(prepareBulk);
     }
-    _log.info("Exiting elasticsearch sink for topic: " + _topic + " after sinking " + sunk + " tuples");
-    
+    _log.info("Exiting elasticsearch sink for topic: " + _topic + " after sinking " + sunkTuples + " tuples");
+    return sunkTuples;
   }
 
   private void flush(BulkRequestBuilder prepareBulk) {

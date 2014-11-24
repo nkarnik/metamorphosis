@@ -55,7 +55,9 @@ public class WorkerS3Sink extends WorkerSink {
     _shardPath = config.getString("shard_path");
     
     _numMessages = 0;
-    _numMessagesThisShard = 1000; // _retryNum < 10 ? (_retryNum + 1) * 100 : 1000;
+    
+    // Sequence of shard sizes: 1,2,4,8,16,32,64,128,256,512,1000,1000...
+    _numMessagesThisShard =  _retryNum < 10 ? (int) Math.pow(2, _retryNum) : 1000;
   }
 
 
@@ -126,7 +128,7 @@ public class WorkerS3Sink extends WorkerSink {
   protected boolean maybeFlush(boolean forceFlush) {
     _log.debug("Fetched " +_numMessages + " so far...");
     
-    if (_numMessages > 0 && (forceFlush || _numMessages > _numMessagesThisShard)) {
+    if (_numMessages > 0 && (forceFlush || _numMessages == _numMessagesThisShard)) {
       File gzFile = null;
       try {
         _writer.close();

@@ -56,7 +56,7 @@ public class WorkerS3Sink extends WorkerSink {
     // Sequence of shard sizes: 1,2,4,8,16,32,64,128,256,512,1024,2048,4096,10000,10000...
     // This is considering that tuples are coming in at a steady pace.
     // If tuples pause, then whatever shards are saved, will be flushed every minute.
-    _numMessagesThisShard =  _retryNum <= 12 ? (int) Math.pow(2, _retryNum) : 1000;
+    _numMessagesThisShard =  _retryNum <= 12 ? (int) Math.pow(2, _retryNum) : 10000;
   }
 
 
@@ -88,14 +88,14 @@ public class WorkerS3Sink extends WorkerSink {
         _writer.newLine();
         _writer.flush();
         if (maybeFlush(false, sunkTuples)) {
-          _log.info("Consumer ("+ iterator.clientId() + ") Retreived message offset to sink from topic " + _topicToRead + " is " + fetchedMessage.offset());
-          _log.info("Flushed shard to S3: " + _shardFull);
+          _log.debug("Consumer ("+ iterator.clientId() + ") Retreived message offset to sink from topic " + _topicToRead + " is " + fetchedMessage.offset());
+          _log.info("Flushed " + sunkTuples + " messages to S3: " + _shardFull );
           _writer.close();
           return sunkTuples;
         }
       }
     }catch(ConsumerTimeoutException e){
-      _log.info("Consumer timed out. maybe flush " + sunkTuples + " messages");  
+      _log.info("Consumer timed out on topic: " + _topicToRead );  
       if(maybeFlush(true, sunkTuples)){
         _log.info("Flushed " + sunkTuples + " messages to S3: " + _shardFull );
       }

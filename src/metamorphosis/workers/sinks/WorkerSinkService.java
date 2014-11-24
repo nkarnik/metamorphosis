@@ -55,7 +55,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       
       client = CuratorFrameworkFactory.builder()
           //.namespace("gmb")
-          .retryPolicy(new ExponentialBackoffRetry(1000, 5))
+          .retryPolicy(new ExponentialBackoffRetry(1000, 10))
           .connectString(kafkaService.getZKConnectString("gmb"))
           .build();
       client.start();
@@ -108,8 +108,12 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
 
     int sunkTuples = workerSink.sink(sinkTopicIterator, _queueNumber);
     _log.info("Sunk #" + sunkTuples + " tuples for topic: " + topic);
-    
-    if(!done){
+
+    if(done){
+      _log.info("Shutting down connector for topic: " + topic);
+      _topicToIteratorCache.remove(topic);
+      _consumer.shutdown();
+    }else{
       //streaming sink, so have to increment retry and push back to worker queue
       int retry = poppedMessage.getJSONObject("sink").getInt("retry") + 1;
       
@@ -120,13 +124,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
       producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
       _log.info("Retry #" + retry + ". topic: " + topic);
-      producer.close(); 
-    }
-    
-    if(done){
-      _log.info("Shutting down connector for topic: " + topic);
-      _topicToIteratorCache.remove(topic);
-      _consumer.shutdown();
+      producer.close();
     }
   }
 }

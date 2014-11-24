@@ -103,7 +103,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       
       sinkTopicIterator = _consumer.createMessageStreams(topicCountMap, stringDecoder, stringDecoder).get(topic).get(0).iterator();
       _log.info("Consumer " + clientName + " instantiated");
-      _topicToIteratorCache.put(topic,sinkTopicIterator);
+      _topicToIteratorCache.put(clientName,sinkTopicIterator);
     }
 
     workerSink.sink(sinkTopicIterator, _queueNumber);

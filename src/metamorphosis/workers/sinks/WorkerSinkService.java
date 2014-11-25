@@ -111,7 +111,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
 
     if(done){
       _log.info("Shutting down connector for topic: " + topic);
-      _topicToIteratorCache.remove(topic);
+      _topicToIteratorCache.remove(clientName);
       _consumer.shutdown();
     }else{
       //streaming sink, so have to increment retry and push back to worker queue

@@ -27,7 +27,6 @@ public class WorkerS3Sink extends WorkerSink {
   private String _topicToRead;
   private String _bucketName;
   private String _shardPath;
-  private int _numMessages;
 
   private String _shardFull;
   private BufferedWriter _writer;
@@ -54,8 +53,10 @@ public class WorkerS3Sink extends WorkerSink {
     _topicToRead = message.getString("topic");
     _shardPath = config.getString("shard_path");
     
-    _numMessages = 0;
-    _numMessagesThisShard = 1000; // _retryNum < 10 ? (_retryNum + 1) * 100 : 1000;
+    // Sequence of shard sizes: 1,2,4,8,16,32,64,128,256,512,1024,2048,4096,10000,10000...
+    // This is considering that tuples are coming in at a steady pace.
+    // If tuples pause, then whatever shards are saved, will be flushed every minute.
+    _numMessagesThisShard =  _retryNum <= 12 ? (int) Math.pow(2, _retryNum) : 10000;
   }
 
 
@@ -66,9 +67,9 @@ public class WorkerS3Sink extends WorkerSink {
   }
 
   @Override
-  public void sink(ConsumerIterator<String, String> iterator, int queueNumber) {
-    
-    int shardNum = (queueNumber + 1) * 1000 + _retryNum;
+  public int sink(ConsumerIterator<String, String> iterator, int queueNumber) {
+    int sunkTuples = 0;
+    int shardNum = (queueNumber + 1) * 10000 + _retryNum;
     
     _shardFull = _shardPath + _shardPrefix + shardNum + ".gz";
     _gzFilePath = "/tmp/" + _shardFull;
@@ -82,29 +83,28 @@ public class WorkerS3Sink extends WorkerSink {
       while (iterator.hasNext()) {
         MessageAndMetadata<String, String> fetchedMessage = iterator.next();
         String messageBody = fetchedMessage.message();
-        _numMessages += 1;
+        sunkTuples += 1;
         _writer.append(messageBody);
         _writer.newLine();
         _writer.flush();
-        if (maybeFlush(false)) {
-          _log.info("Consumer ("+ iterator.clientId() + ") Retreived message offset to sink from topic " + _topicToRead + " is " + fetchedMessage.offset());
-          _log.info("Flushed shard to S3: " + _shardFull);
+        if (maybeFlush(false, sunkTuples)) {
+          _log.debug("Consumer ("+ iterator.clientId() + ") Retreived message offset to sink from topic " + _topicToRead + " is " + fetchedMessage.offset());
+          _log.info("Flushed " + sunkTuples + " messages to S3: " + _shardFull );
           _writer.close();
-          return;
+          return sunkTuples;
         }
       }
     }catch(ConsumerTimeoutException e){
-      _log.info("Consumer timed out. maybe flush " + _numMessages + " messages");  
-      if(maybeFlush(true)){
-        _log.info("Flushed shard to S3: " + _shardFull);
-
+      _log.info("Consumer timed out on topic: " + _topicToRead );  
+      if(maybeFlush(true, sunkTuples)){
+        _log.info("Flushed " + sunkTuples + " messages to S3: " + _shardFull );
       }
     }
     catch (IOException ioe) {
       _log.error("Sink Error !!!");
       _log.error(ioe.getMessage());
       _log.error(Joiner.on("\n\t").join(ioe.getStackTrace()));
-      return;
+      return sunkTuples;//?
     }
     finally {
       if (_writer != null){
@@ -119,18 +119,19 @@ public class WorkerS3Sink extends WorkerSink {
         gzFile.delete();
       }
     }
+    return sunkTuples;
   }
   
 
   
-  protected boolean maybeFlush(boolean forceFlush) {
-    _log.debug("Fetched " +_numMessages + " so far...");
+  protected boolean maybeFlush(boolean forceFlush, int sunkTuples) {
+    _log.debug("Fetched " +sunkTuples + " so far...");
     
-    if (_numMessages > 0 && (forceFlush || _numMessages > _numMessagesThisShard)) {
+    if (sunkTuples > 0 && (forceFlush || sunkTuples == _numMessagesThisShard)) {
       File gzFile = null;
       try {
         _writer.close();
-
+        
         gzFile = new File(_gzFilePath);
         _log.debug("File path is: " + _gzFilePath + " with length " + gzFile.length());
         S3Util.copyFile(gzFile, _bucketName, _shardFull);

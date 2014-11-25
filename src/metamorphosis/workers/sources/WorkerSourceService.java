@@ -125,13 +125,15 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
       String topicQueue = workerSource.getTopic();
       // Distribute strategy
       int msgsSent = 0;
+      int skipped = 0;
       int bytesReceived = 0;
       try{
         for( String workerQueueMessage : messageIterator) {
           int messageLength = workerQueueMessage.getBytes().length;
 
           if(messageLength >=  MAX_MESSAGE_LENGTH){
-            _log.error("Tuple too large, skipping: " + workerQueueMessage.substring(0,20) + "...");
+            _log.debug("Tuple too large, skipping: " + workerQueueMessage.substring(0,20) + "...");
+            skipped += 1;
             continue;
           }
           //_log.info("Sending message " + workerQueueMessage + " to queue: " + topic);
@@ -149,7 +151,7 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
         
       }finally{
         File cachedFile = messageIteratorPair.getValue0();
-        _log.info("Messages sent: " + msgsSent + ". Bytes: " + bytesReceived + " from file:\t" + cachedFile.getAbsolutePath());
+        _log.info("Messages sent: " + msgsSent + ". skipped: " + skipped + " Bytes: " + bytesReceived + " from file: " + cachedFile.getAbsolutePath());
         
         if(cachedFile != null && cachedFile.exists()){
           _log.debug("Deleting cached file: " + cachedFile.getAbsolutePath());

@@ -55,7 +55,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       
       client = CuratorFrameworkFactory.builder()
           //.namespace("gmb")
-          .retryPolicy(new ExponentialBackoffRetry(1000, 5))
+          .retryPolicy(new ExponentialBackoffRetry(1000, 10))
           .connectString(kafkaService.getZKConnectString("gmb"))
           .build();
       client.start();
@@ -103,34 +103,28 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       
       sinkTopicIterator = _consumer.createMessageStreams(topicCountMap, stringDecoder, stringDecoder).get(topic).get(0).iterator();
       _log.info("Consumer " + clientName + " instantiated");
-      _topicToIteratorCache.put(topic,sinkTopicIterator);
+      _topicToIteratorCache.put(clientName,sinkTopicIterator);
     }
 
-    workerSink.sink(sinkTopicIterator, _queueNumber);
-    
-    if(!done){
-      //streaming sink, so have to increment retry and push back to worker queue
-      int retry = poppedMessage.getJSONObject("sink").getInt("retry") + 1;
-      
-      if(retry > 300){
-        _log.info("Max retries reached. Stopping sink! Topic: " + topic);
-        done = true;
-      }else{
-        poppedMessage.getJSONObject("sink").element("retry", retry);
-        List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
-        messages.add(new KeyedMessage<Integer,String>(_sourceTopic, poppedMessage.toString()));
-        Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_kafkaService.getSeedBrokers()), "kafka.producer.DefaultPartitioner");
-        Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
-        producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
-        _log.info("Retry #" + retry + ". Sent message to topic: " + _sourceTopic  + " :: "+ poppedMessage.toString() );
-        producer.close(); 
-      }
-    }
-    
+    int sunkTuples = workerSink.sink(sinkTopicIterator, _queueNumber);
+    _log.info("Sunk #" + sunkTuples + " tuples for topic: " + topic);
+
     if(done){
       _log.info("Shutting down connector for topic: " + topic);
       _topicToIteratorCache.remove(topic);
       _consumer.shutdown();
+    }else{
+      //streaming sink, so have to increment retry and push back to worker queue
+      int retry = poppedMessage.getJSONObject("sink").getInt("retry") + 1;
+      
+      poppedMessage.getJSONObject("sink").element("retry", retry);
+      List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
+      messages.add(new KeyedMessage<Integer,String>(_sourceTopic, poppedMessage.toString()));
+      Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_kafkaService.getSeedBrokers()), "kafka.producer.DefaultPartitioner");
+      Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
+      producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
+      _log.info("Retry #" + retry + ". topic: " + topic);
+      producer.close();
     }
   }
 }

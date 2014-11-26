@@ -96,7 +96,7 @@ public class WorkerS3Sink extends WorkerSink {
         }
       }
     }catch(ConsumerTimeoutException e){
-      _log.info("Consumer timed out on topic: " + _topicToRead );  
+      _log.info("Consumer timed out on topic: " + _topicToRead + ". sinking until timed out? " + sinkUntilTimeout );  
       if(maybeFlush(true, sunkTuples)){
         _log.info("Flushed " + sunkTuples + " messages to S3: " + _shardFull );
       }

@@ -18,6 +18,9 @@ import metamorphosis.workers.sinks.WorkerSinkService;
 import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;
 
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.RetryOneTime;
 import org.apache.log4j.Logger;
 import org.jets3t.service.S3ServiceException;
 import org.jets3t.service.model.S3Object;
@@ -39,7 +42,7 @@ public class WorkerSinkServiceTest {
   private String TOPIC_TO_SINK = "single_worker_sink";
 
   @Before
-  public void setup() {
+  public void setup() throws Exception {
     _workerQueues = new ArrayList<String>();
     
     _localKakfaService = new LocalKafkaService(NUM_BROKERS);
@@ -69,6 +72,23 @@ public class WorkerSinkServiceTest {
     Config.singleton().put("kafka.brokers", Joiner.on(",").join(_localKakfaService.getSeedBrokers()));
 
     _log.info("Test data added");
+    
+    CuratorFramework client = CuratorFrameworkFactory.builder()
+        //.namespace("gmb")
+        .retryPolicy(new RetryOneTime(1000))
+        .connectString(_localKakfaService.getZKConnectString("gmb"))
+        .build();
+    client.start();
+    // ZkClient client = kafkaService.createGmbZkClient();
+    _log.debug("Client connecting ...");
+    String bufferTopicPath = "/buffer/" + TOPIC_TO_SINK + "/status/done";
+
+    _log.debug("Client started: ");
+    if(client.checkExists().forPath(bufferTopicPath) == null){
+      _log.debug("Creating path: " + bufferTopicPath);
+      client.create().creatingParentsIfNeeded().forPath(bufferTopicPath);
+      _log.debug("Created path: " + bufferTopicPath);
+    }
   }
 
   @After

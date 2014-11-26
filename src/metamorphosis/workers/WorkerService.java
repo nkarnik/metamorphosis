@@ -105,14 +105,14 @@ public abstract class WorkerService<T extends Worker> {
             List<Future<Boolean>> topicFutures = _perTopicFutures.get(topic);
             // Ensure that our futures are clean. Any completed futures should be removed.
             Iterator<Future<Boolean>> iterator = topicFutures.iterator();
-            _log.info("Futures before cleanup: " + topicFutures.size());
+            _log.debug("Futures before cleanup: " + topicFutures.size());
             while(iterator.hasNext()){
               Future<Boolean> next = iterator.next();
               if(next.isDone() || next.isCancelled()){
                 iterator.remove();
               }
             }
-            _log.info("Futures after cleanup: " + topicFutures.size());
+            _log.debug("Futures after cleanup: " + topicFutures.size());
             if(poppedMessage.containsKey("schloss_message")){
               // Wait on all currently running worker messages for this topic.
               _log.info("Processing a schloss_message for topic: " + topic + ". Awaiting " + topicFutures.size() + " futures.");
@@ -140,7 +140,7 @@ public abstract class WorkerService<T extends Worker> {
                 }
               });
               topicFutures.add(topicFuture);  
-              _log.info("Added a future. Total futures now :: " + topicFutures.size());
+              _log.debug("Added a future. Total futures now :: " + topicFutures.size());
             }
             
 

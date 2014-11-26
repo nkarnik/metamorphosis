@@ -115,7 +115,7 @@ public class WorkerElasticsearchSinkTest {
     .key("topic").value(TOPIC_TO_SINK)
     .key("sink").object()
         .key("type").value("elasticsearch")
-        .key("retry").value(0)
+        .key("shard_num").value(0)
         .key("config").object()
           .key("index").value(TOPIC_TO_SINK)
         .endObject()

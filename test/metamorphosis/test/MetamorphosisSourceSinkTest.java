@@ -173,7 +173,7 @@ public class MetamorphosisSourceSinkTest {
     .key("topic").value(destinationTopic)
     .key("sink").object()
         .key("type").value("s3")
-        .key("retry").value(0)
+        .key("shard_num").value(0)
         .key("config").object()
           .key("shard_path").value("test/metamorphosis_test/")
           .key("shard_prefix").value("test_shard_")

@@ -163,7 +163,7 @@ public class SchlossTest {
     .key("topic").value(sinkTopic)
     .key("sink").object()
         .key("type").value("s3")
-        .key("retry").value(0)
+        .key("shard_num").value(0)
         .key("config").object()
           .key("shard_path").value("test/worker_sink_service/" + sinkTopic + "/")
           .key("shard_prefix").value("test_shard_")

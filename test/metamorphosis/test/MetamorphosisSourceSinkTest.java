@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 import metamorphosis.kafka.LocalKafkaService;
 import metamorphosis.schloss.SchlossService;
 import metamorphosis.utils.Config;
+import metamorphosis.utils.Utils;
 import metamorphosis.utils.s3.S3Exception;
 import metamorphosis.utils.s3.S3Util;
 import metamorphosis.workers.sinks.WorkerSinkService;
@@ -28,7 +29,7 @@ import org.junit.Test;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 
-public class MetamorphosisSourceTest {
+public class MetamorphosisSourceSinkTest {
 
   private static final int NUM_BROKERS = 1;
   private static final String SCHLOSS_SOURCE_QUEUE = "source_queue";
@@ -43,7 +44,7 @@ public class MetamorphosisSourceTest {
   private WorkerSinkService _workerSinkService;
   private String destinationTopic = "some_topic";
   
-  private static Logger _log = Logger.getLogger(MetamorphosisSourceTest.class);
+  private static Logger _log = Logger.getLogger(MetamorphosisSourceSinkTest.class);
 
   @Before
   public void setup(){
@@ -112,7 +113,8 @@ public class MetamorphosisSourceTest {
     .key("source").object()
         .key("type").value("s3")
         .key("config").object()
-          .key("manifest").value("data/homepages/20140620.manifest.debug.small.one")
+          .key("shard_path").value("data/homepages/samples/")
+          .key("shard_prefix").value("part")
           .key("bucket").value("fatty.zillabyte.com")
           .key("credentials").object()
             .key("secret").value("")
@@ -135,13 +137,14 @@ public class MetamorphosisSourceTest {
     _workerSourceService.startRoundRobinPushRead()
       .get();
     // We have two messages, one is a 'done' message from schloss.
-    for(int i = 0; i < 2; i++){
+    for(int i = 0; i < 11; i++){
       _log.info("Popping round robin: " + i);
       _workerSourceService.startRoundRobinPopThread()
         .get();
-      _log.info("Waiting on Source worker to complete");
-      _workerSourceService.awaitTermination(3, TimeUnit.MINUTES);
+      Utils.sleep(1000);
     }
+    _log.info("Waiting on Source worker to complete");
+    _workerSourceService.awaitTermination(3, TimeUnit.MINUTES);
 
     _log.info("");
     _log.info("");
@@ -152,7 +155,7 @@ public class MetamorphosisSourceTest {
     _log.info("");
     _log.info("Total messages on producer queues: " + numMessages);   
     _log.info("");
-    assertEquals(100, numMessages);
+    assertEquals(976, numMessages); // Should skip some messages because they're > 1mb uncompressed.
 
     ZkClient gmbZkClient = _localKakfaService.createGmbZkClient();
     gmbZkClient.waitUntilConnected();
@@ -216,7 +219,7 @@ public class MetamorphosisSourceTest {
         
     }
     _log.info("Final number of messages on s3: " + totalSunk);
-    assertEquals(100, totalSunk);
+    assertEquals(976, totalSunk);
       
     } catch (S3ServiceException e) {
       // TODO Auto-generated catch block

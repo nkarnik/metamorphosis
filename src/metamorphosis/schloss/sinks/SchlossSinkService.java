@@ -7,14 +7,8 @@ import kafka.producer.KeyedMessage;
 import kafka.producer.Producer;
 import kafka.producer.ProducerConfig;
 import kafka.utils.TestUtils;
-import metamorphosis.kafka.KafkaService;
 import metamorphosis.schloss.SchlossReadThread;
-import metamorphosis.utils.APIException;
-import metamorphosis.utils.Config;
 import metamorphosis.utils.ExponentialBackoffTicker;
-import metamorphosis.utils.KafkaUtils;
-import metamorphosis.utils.RestAPIHelper;
-import net.sf.json.JSONObject;
 
 import org.apache.log4j.Logger;
 

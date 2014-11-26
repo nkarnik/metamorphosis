@@ -21,6 +21,7 @@ import metamorphosis.utils.KafkaUtils;
 import metamorphosis.workers.WorkerService;
 import net.sf.json.JSONObject;
 
+import org.apache.commons.lang.NotImplementedException;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.ExponentialBackoffRetry;
@@ -69,6 +70,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
         // Buffer is done being written to.
         // TODO: Maybe the sinks didn't exhaust them... confirm.
         _log.info("Done path (" + bufferTopicPath+ ") found. Stopping sinks. Running one more time to catch tuples we might not have.");
+        // If the done path is found, ignore the _numMessagesOn
         done = true;
       }
 
@@ -106,7 +108,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       _topicToIteratorCache.put(clientName,sinkTopicIterator);
     }
 
-    int sunkTuples = workerSink.sink(sinkTopicIterator, _queueNumber);
+    int sunkTuples = workerSink.sink(sinkTopicIterator, _queueNumber, done);// If done, sinkUntilTimeout.
     _log.info("Sunk #" + sunkTuples + " tuples for topic: " + topic);
 
     if(done){
@@ -126,5 +128,10 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       _log.info("Retry #" + retry + ". topic: " + topic);
       producer.close();
     }
+  }
+
+  @Override
+  protected void processSchlossMessage(JSONObject poppedMessage) {
+    throw new NotImplementedException("Unexpected schloss_message for sinks.");
   }
 }

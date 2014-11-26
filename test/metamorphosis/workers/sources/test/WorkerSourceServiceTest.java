@@ -57,6 +57,7 @@ public class WorkerSourceServiceTest {
         .key("type").value("s3")
         .key("config").object()
           .key("shard_path").value("data/homepages/2014/0620/1013632003/part_0002.gz")
+          .key("shard_prefix").value("part_")
           .key("bucket").value("fatty.zillabyte.com")
           .key("credentials").object()
             .key("secret").value("")
@@ -78,7 +79,7 @@ public class WorkerSourceServiceTest {
     
     _log.info("Reading messages for confirmation");
     _log.info("About to read from topic: " + DESTINATION_TOPIC);
-    int messages = _localKakfaService.readNumMessages(DESTINATION_TOPIC);
+    long messages = _localKakfaService.getTopicMessageCount(DESTINATION_TOPIC);
     _log.info("There are " + messages + " messages in this queue");
     _log.info("Total messages on producer queues: " + messages);
     

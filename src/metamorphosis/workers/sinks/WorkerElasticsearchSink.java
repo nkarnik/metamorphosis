@@ -13,7 +13,6 @@ import org.apache.log4j.Logger;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
-import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
@@ -45,7 +44,7 @@ public class WorkerElasticsearchSink extends WorkerSink {
   }
 
   @Override
-  public int sink(ConsumerIterator<String, String> sinkTopicIterator, int queueNumber) {
+  public int sink(ConsumerIterator<String, String> sinkTopicIterator, int queueNumber, boolean sinkUntilTimeout) {
     _log.info("Entering elasticsearch sink for topic: " + _topic);
     int sunkTuples = 0;
     BulkRequestBuilder prepareBulk = _client.prepareBulk();

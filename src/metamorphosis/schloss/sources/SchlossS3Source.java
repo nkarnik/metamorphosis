@@ -1,16 +1,13 @@
 package metamorphosis.schloss.sources;
 
-import java.io.IOException;
 import java.util.List;
 
-import metamorphosis.utils.s3.S3Exception;
 import metamorphosis.utils.s3.S3Util;
 import net.sf.json.JSONObject;
 import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;
 
 import org.apache.log4j.Logger;
-import org.javatuples.Pair;
 import org.jets3t.service.S3ServiceException;
 import org.jets3t.service.model.S3Object;
 

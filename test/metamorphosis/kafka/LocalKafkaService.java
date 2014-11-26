@@ -189,41 +189,6 @@ public class LocalKafkaService extends KafkaService{
     consumer.shutdown();
     return messages;
   }
-  
-  /** Returns number of messages found in all partitions for the given topic*/
-  public int readNumMessages(String topic){
-    int numMessages = 0;
-    
-    String clientName = "temporary_message_reader_" + Math.random() * 100000;
-    Properties props = KafkaUtils.getDefaultProperties(getZKConnectString("kafka"), clientName);
-    props.put("consumer.timeout.ms", "500");
-    ConsumerConnector consumer = kafka.consumer.Consumer.createJavaConsumerConnector(new ConsumerConfig(props));
-
-    Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
-    topicCountMap.put(topic, new Integer(1)); // This consumer will only have one thread
-    StringDecoder stringDecoder = new StringDecoder(new VerifiableProperties());
-    KafkaStream<String,String> kafkaStream = consumer.createMessageStreams(topicCountMap, stringDecoder, stringDecoder).get(topic).get(0);
-    ConsumerIterator<String, String> iterator = kafkaStream.iterator();
-    _log.info("Consumer " + clientName + " instantiated");
-    try{
-      while(iterator.hasNext()){
-        String message = iterator.next().message();
-        //_log.info("Next message is " + message.substring(0, 30) + "...");
-        numMessages++;
-      }
-    }catch(ConsumerTimeoutException e){
-      _log.info("Completed reading from " + topic + ". Num Messages: " + numMessages);
-    }catch(Exception e) {
-      _log.info("Error is: " + e.getMessage());
-    }
-    consumer.shutdown();
-    return numMessages;
-  }
-
-  
-  
-  
-  
 
   public void shutDown() {
 

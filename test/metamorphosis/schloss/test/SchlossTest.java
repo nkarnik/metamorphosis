@@ -97,9 +97,9 @@ public class SchlossTest {
     _log.info("Reading messages for confirmation");
     int receivedMessagesSize = 0;
     for (int i = 0; i < NUM_BROKERS; i++) {
-      List<String> messages = _localKakfaService.readStringMessagesInTopic(PRODUCER_QUEUE_PREFIX + i);
-      _log.info("There are " + messages.size() + " messages in this queue");
-      receivedMessagesSize += messages.size();
+      long numMessages = _localKakfaService.getTopicMessageCount(PRODUCER_QUEUE_PREFIX + i);
+      _log.info("There are " + numMessages + " messages in this queue");
+      receivedMessagesSize += numMessages;
     }
     _log.info("Total messages on producer queues: " + receivedMessagesSize);
     // Each broker gets a DONE message.
@@ -136,7 +136,9 @@ public class SchlossTest {
     .key("source").object()
         .key("type").value("s3")
         .key("config").object()
-          .key("manifest").value("data/homepages/20140620.manifest.debug")
+          .key("shard_path").value("data/homepages/samples/")
+          .key("shard_prefix").value("part")
+          
           .key("bucket").value("fatty.zillabyte.com")
           .key("credentials").object()
             .key("secret").value("")

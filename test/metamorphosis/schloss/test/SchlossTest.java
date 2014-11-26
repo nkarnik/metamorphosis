@@ -83,7 +83,7 @@ public class SchlossTest {
 
   
 
-  @Test
+  @Test(timeout=1000*200)
   public void testProcessGMBSourceMessage() throws InterruptedException, ExecutionException {
     String destinationTopic = "some_topic";
     sendSourceMessage(destinationTopic);

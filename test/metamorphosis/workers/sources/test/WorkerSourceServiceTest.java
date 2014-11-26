@@ -47,7 +47,7 @@ public class WorkerSourceServiceTest {
     _localKakfaService.shutDown();
   }
 
-  @Test
+  @Test(timeout=1000*200)
   public void testSingleWorkerS3Source() throws InterruptedException, ExecutionException{
 
     JSONBuilder builder = new JSONStringer();

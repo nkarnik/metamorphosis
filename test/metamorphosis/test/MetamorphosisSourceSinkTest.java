@@ -105,7 +105,7 @@ public class MetamorphosisSourceSinkTest {
     
   }
   
-  @Test
+  @Test(timeout=1000*600)
   public void testSourceMessage() throws InterruptedException, ExecutionException{
     JSONBuilder builder = new JSONStringer();
     builder.object()

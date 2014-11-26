@@ -103,7 +103,7 @@ public class WorkerElasticsearchSinkTest {
     _elasticsearchNode.close();
     FileUtils.deleteQuietly(_tempDir);
   }
-  @Test
+  @Test(timeout=1000*200)
   public void testSingleWorkerElasticsearchSink() throws InterruptedException, ExecutionException, S3ServiceException, S3Exception, IOException{
 
     _log.info("Deleting elastic search index");

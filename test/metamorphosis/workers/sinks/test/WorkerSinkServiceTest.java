@@ -76,7 +76,7 @@ public class WorkerSinkServiceTest {
     _localKakfaService.shutDown();
   }
   
-  @Test
+  @Test(timeout=1000*200)
   public void testSingleWorkerS3Sink() throws InterruptedException, ExecutionException, S3ServiceException, S3Exception, IOException{
     
     try {

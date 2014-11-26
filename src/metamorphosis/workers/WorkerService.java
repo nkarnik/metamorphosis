@@ -9,6 +9,7 @@ import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -177,8 +178,12 @@ public abstract class WorkerService<T extends Worker> {
             // Blocking wait on source topic
             while(iterator.hasNext()){
               MessageAndMetadata<String, JSONObject> messageAndMeta = iterator.next();
-              // TODO: Change this to use an executorPool
               _topicMessageQueue.push(messageAndMeta);
+              // TODO: Something like this to limit the executor pool to a set number of tasks
+              // Advantage? Keeps messages in the kafka queue until we are ready to process
+              // Restarts will kill the round-robin queue, but keep messages in kafka for consumption later.
+              // ExecutorCompletionService service = new ExecutorCompletionService<>(_executorPool);
+              // service.take();
             }
           }catch(ConsumerTimeoutException e){
             _log.debug("No messages yet on " + _sourceTopic + ". Blocking on iterator.hasNext...");

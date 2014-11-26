@@ -67,7 +67,7 @@ public class WorkerS3Sink extends WorkerSink {
   }
 
   @Override
-  public int sink(ConsumerIterator<String, String> iterator, int queueNumber) {
+  public int sink(ConsumerIterator<String, String> iterator, int queueNumber, boolean sinkUntilTimeout) {
     int sunkTuples = 0;
     int shardNum = (queueNumber + 1) * 10000 + _retryNum;
     
@@ -87,7 +87,8 @@ public class WorkerS3Sink extends WorkerSink {
         _writer.append(messageBody);
         _writer.newLine();
         _writer.flush();
-        if (maybeFlush(false, sunkTuples)) {
+        // Only flush if we're not expected to sinkUntilTimeout
+        if (!sinkUntilTimeout && maybeFlush(false, sunkTuples)) {
           _log.debug("Consumer ("+ iterator.clientId() + ") Retreived message offset to sink from topic " + _topicToRead + " is " + fetchedMessage.offset());
           _log.info("Flushed " + sunkTuples + " messages to S3: " + _shardFull );
           _writer.close();
@@ -95,7 +96,7 @@ public class WorkerS3Sink extends WorkerSink {
         }
       }
     }catch(ConsumerTimeoutException e){
-      _log.info("Consumer timed out on topic: " + _topicToRead );  
+      _log.info("Consumer timed out on topic: " + _topicToRead + ". sinking until timed out? " + sinkUntilTimeout );  
       if(maybeFlush(true, sunkTuples)){
         _log.info("Flushed " + sunkTuples + " messages to S3: " + _shardFull );
       }

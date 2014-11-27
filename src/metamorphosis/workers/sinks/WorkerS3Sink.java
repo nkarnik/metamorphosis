@@ -97,7 +97,7 @@ public class WorkerS3Sink extends WorkerSink {
       }
     }catch(ConsumerTimeoutException e){
       if(sinkUntilTimeout){
-        _log.info("Consumer timed out on topic: " + _topicToRead + ". Sinking until we exhausted topics");  
+        _log.info("Consumer timed out on topic: " + _topicToRead + ". Final flush has #" + sunkTuples + " messages");  
       }
       if(maybeFlush(true, sunkTuples)){
         _log.info("Flushed " + sunkTuples + " messages to S3: " + _shardFull );

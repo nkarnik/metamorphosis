@@ -35,7 +35,7 @@ public class WorkerS3Sink extends WorkerSink {
   private String _shardPrefix;
   //ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(1000);
 
-  private int _retryNum;
+  private int _shardNum;
 
   private int _numMessagesThisShard;
 
@@ -45,7 +45,7 @@ public class WorkerS3Sink extends WorkerSink {
     // TODO Auto-generated constructor stub
     _message = message;
     _sinkObject = _message.getJSONObject("sink");
-    _retryNum = _sinkObject.getInt("retry");
+    _shardNum = _sinkObject.getInt("shard_num");
     JSONObject config = _sinkObject.getJSONObject("config");
     _bucketName = config.getString("bucket");
     _shardPrefix = config.getString("shard_prefix");
@@ -56,7 +56,7 @@ public class WorkerS3Sink extends WorkerSink {
     // Sequence of shard sizes: 1,2,4,8,16,32,64,128,256,512,1024,2048,4096,10000,10000...
     // This is considering that tuples are coming in at a steady pace.
     // If tuples pause, then whatever shards are saved, will be flushed every minute.
-    _numMessagesThisShard =  _retryNum <= 12 ? (int) Math.pow(2, _retryNum) : 10000;
+    _numMessagesThisShard =  _shardNum <= 12 ? (int) Math.pow(2, _shardNum) : 10000;
   }
 
 
@@ -69,7 +69,7 @@ public class WorkerS3Sink extends WorkerSink {
   @Override
   public int sink(ConsumerIterator<String, String> iterator, int queueNumber, boolean sinkUntilTimeout) {
     int sunkTuples = 0;
-    int shardNum = (queueNumber + 1) * 10000 + _retryNum;
+    int shardNum = (queueNumber + 1) * 10000 + _shardNum;
     
     _shardFull = _shardPath + _shardPrefix + shardNum + ".gz";
     _gzFilePath = "/tmp/" + _shardFull;
@@ -96,7 +96,9 @@ public class WorkerS3Sink extends WorkerSink {
         }
       }
     }catch(ConsumerTimeoutException e){
-      _log.info("Consumer timed out on topic: " + _topicToRead + ". sinking until timed out? " + sinkUntilTimeout );  
+      if(sinkUntilTimeout){
+        _log.info("Consumer timed out on topic: " + _topicToRead + ". Final flush has #" + sunkTuples + " messages");  
+      }
       if(maybeFlush(true, sunkTuples)){
         _log.info("Flushed " + sunkTuples + " messages to S3: " + _shardFull );
       }

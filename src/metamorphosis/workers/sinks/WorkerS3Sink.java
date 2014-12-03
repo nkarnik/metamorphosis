@@ -72,11 +72,11 @@ public class WorkerS3Sink extends WorkerSink {
     int shardNum = (queueNumber + 1) * 10000 + _shardNum;
     
     _shardFull = _shardPath + _shardPrefix + shardNum + ".gz";
-    _gzFilePath = "/tmp/" + _shardFull;
+    _gzFilePath = "/mnt/shards/" + _shardFull;
     
 
     try{
-      File parentDir = new File("/tmp/" + _shardPath);
+      File parentDir = new File("/mnt/shards/" + _shardPath);
       parentDir.mkdirs();
       _writer = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(_gzFilePath)), "UTF-8"));
       _log.debug("Created File locally: " + _gzFilePath);

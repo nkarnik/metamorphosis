@@ -121,7 +121,8 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       // Only increment retry on successful attempt.
       int shardNum = poppedMessage.getJSONObject("sink").getInt("shard_num");
       if(sunkTuples > 0){
-       shardNum += 1; 
+       shardNum += 1;
+       _log.info("next shard #" + shardNum + ". topic: " + topic);
       }
       
       //streaming sink, so have to increment shardNum and push back to worker queue
@@ -131,7 +132,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_kafkaService.getSeedBrokers()), "kafka.producer.DefaultPartitioner");
       Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
       producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
-      _log.info("next shard#" + shardNum + ". topic: " + topic);
+      
       producer.close();
     }
   }

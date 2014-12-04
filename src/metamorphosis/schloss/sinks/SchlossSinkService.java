@@ -128,16 +128,18 @@ public class SchlossSinkService extends SchlossReadThread<SchlossSink>{
         params.add(topicSize);
       }
     }
-    JSONObject sizes = new JSONObject();
-    sizes.put("sizes", params);
-    try {
-      String path = "/relation/sizes_update";
-      _log.debug("Sending message: " + sizes.toString() + " to path: " + path);
-      RestAPIHelper.post(path, sizes.toString(), API_AUTH_TOKEN);
-    } catch (APIException e) {
-      _log.error("Failed updating topic size : " + sizes.toString());
-      e.printStackTrace();
-      //throw new APIException("Set size failed for relation: " + topic);
+    if(params.size() > 0){
+      JSONObject sizes = new JSONObject();
+      sizes.put("sizes", params);
+      try {
+        String path = "/relation/sizes_update";
+        _log.debug("Sending message: " + sizes.toString() + " to path: " + path);
+        RestAPIHelper.post(path, sizes.toString(), API_AUTH_TOKEN);
+      } catch (APIException e) {
+        _log.error("Failed updating topic size : " + sizes.toString());
+        e.printStackTrace();
+        //throw new APIException("Set size failed for relation: " + topic);
+      }
     }
     _log.info("Done handling API update for topics: " + activeSinkTopicsString);
 

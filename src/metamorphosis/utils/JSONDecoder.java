@@ -17,12 +17,4 @@ public class JSONDecoder implements Decoder<JSONObject> {
     }
     return jsonObject;
   }
-
-  public static void main(String[] args) {
-    JSONObject fromObject = JSONObject.fromObject("{'nothing': 1}");
-    
-    System.out.println(fromObject.toString());
-    String string = fromObject.getString("topic");
-    System.out.println(string);
-  }
 }

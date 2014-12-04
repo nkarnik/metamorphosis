@@ -80,7 +80,7 @@ public abstract class SchlossReadThread<T extends SchlossHandler> implements Cal
             // Create topic with default settings
             kafkaService.createTopic(topic, 20, 1);
             _log.info("Waiting 15 seconds for safety");
-            //Utils.sleep(15 * 1000); // For safety. Maybe the size check or workers acting immediately after is causing issues?
+            Utils.sleep(15 * 1000); // For safety. Maybe the size check or workers acting immediately after is causing issues?
           }
 
           List<String> workerQueueMessages = schlossHandler.getWorkerMessages();

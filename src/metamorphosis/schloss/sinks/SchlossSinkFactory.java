@@ -1,15 +1,23 @@
 package metamorphosis.schloss.sinks;
 
 import metamorphosis.schloss.SchlossHandlerFactory;
+import net.sf.json.JSONException;
 import net.sf.json.JSONObject;
 
-import org.apache.commons.lang.NotImplementedException;
+import org.apache.log4j.Logger;
 
 public class SchlossSinkFactory implements SchlossHandlerFactory<SchlossSink>{
 
+  private Logger _log = Logger.getLogger(SchlossSinkFactory.class);
   @Override
   public SchlossSink createSchlossHandler(JSONObject message) {
-    String type = message.getJSONObject("sink").getString("type");
+    String type = null;
+    try{
+      type = message.getJSONObject("sink").getString("type");
+    }catch(JSONException e){
+      _log.error("Expected sink message to contain sink object with a type string. Not found! : " + message.toString());
+      return null;
+    }
     SchlossSink schlossSink = null;
     switch(type){
     case "s3":
@@ -19,10 +27,10 @@ public class SchlossSinkFactory implements SchlossHandlerFactory<SchlossSink>{
       schlossSink = new SchlossElasticsearchSink(message);
       break;
     case "kinesis":
-      
+      _log.error("Kinesis sources not supported.");
       break;
-     default:
-      throw new NotImplementedException("Cannot handle source of type: " + type); 
+    default:
+      _log.error("Cannot handle source of type: " + type); 
 
     }
     return schlossSink;

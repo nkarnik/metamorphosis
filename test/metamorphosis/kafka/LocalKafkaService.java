@@ -138,7 +138,7 @@ public class LocalKafkaService extends KafkaService{
     try {
     _producer.send(scala.collection.JavaConversions.asScalaBuffer(messages));
     _producer.close();
-    _log.info("Successfully sent message");
+    _log.debug("Successfully sent message");
     }
     catch (Exception e) {
       _log.info(e.getMessage());

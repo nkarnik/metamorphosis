@@ -13,6 +13,7 @@ import metamorphosis.utils.ExponentialBackoffTicker;
 import metamorphosis.utils.JSONDecoder;
 import metamorphosis.utils.KafkaUtils;
 import metamorphosis.utils.Utils;
+import net.sf.json.JSONException;
 import net.sf.json.JSONObject;
 
 import org.apache.log4j.Logger;
@@ -53,8 +54,24 @@ public abstract class SchlossReadThread<T extends SchlossHandler> implements Cal
         while(iterator.hasNext()){
           MessageAndMetadata<String, JSONObject> next = iterator.next();
           JSONObject message = next.message();
-          String topic = message.getString("topic");
-
+          if(message == null){
+            _log.error("Null object, most likely bad json.");
+            continue;
+          }
+          String topic = null;
+          try{
+            topic = message.getString("topic");
+          }catch(JSONException e){
+            _log.error("Bad message, no topic provided!: " + message);
+            continue;
+          }
+          // Schloss is basically a distributor. Each message has a distributor that get's the worker messages
+          SchlossHandler schlossHandler = _factory.createSchlossHandler(message);
+          if(schlossHandler == null){
+            _log.error("Cannot handle message. Ignoring: " + message);
+            continue;
+          }
+          
           _log.info("Processing message: " + message.toString());
           KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
           if(kafkaService.hasTopic(topic)){
@@ -63,10 +80,9 @@ public abstract class SchlossReadThread<T extends SchlossHandler> implements Cal
             // Create topic with default settings
             kafkaService.createTopic(topic, 20, 1);
             _log.info("Waiting 15 seconds for safety");
-            Utils.sleep(15 * 1000); // For safety. Maybe the size check or workers acting immediately after is causing issues?
+            //Utils.sleep(15 * 1000); // For safety. Maybe the size check or workers acting immediately after is causing issues?
           }
-          // Schloss is basically a distributor. Each message has a distributor that get's the worker messages
-          SchlossHandler schlossHandler = _factory.createSchlossHandler(message);
+
           List<String> workerQueueMessages = schlossHandler.getWorkerMessages();
           distributeMessagesToQueues(_workerQueues, workerQueueMessages, topic);
 

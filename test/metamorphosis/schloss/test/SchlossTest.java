@@ -111,7 +111,7 @@ public class SchlossTest {
   }
   
   @Test 
-  //@Ignore("Requires local API to be running. TODO: Use MockAPI")
+  @Ignore("Requires local API to be running. TODO: Use MockAPI")
   public void testAPITopicSizeUpdate() throws Exception{
     Config.singleton().put("update_sizes_to_api", true);
     Config.singleton().put("api.port", 5000);

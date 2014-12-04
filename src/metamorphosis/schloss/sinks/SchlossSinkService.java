@@ -34,7 +34,7 @@ public class SchlossSinkService extends SchlossReadThread<SchlossSink>{
   ExponentialBackoffTicker _ticker = new ExponentialBackoffTicker(100);
   Logger _log = Logger.getLogger(SchlossSinkService.class);
 
-  
+
   public SchlossSinkService(String messageTopic) {
     super(messageTopic, "worker.sink.queues", new SchlossSinkFactory());
   }
@@ -52,7 +52,7 @@ public class SchlossSinkService extends SchlossReadThread<SchlossSink>{
     // Add to active sink topics so size can be updated
     //_log.info("Adding active sink topic: " + topic);
     _activeSinkTopics.add(topic);
-    
+
     //Create the producer for this distribution
     Properties properties = TestUtils.getProducerConfig(Joiner.on(',').join(_brokers), "kafka.producer.DefaultPartitioner");
     Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(properties));
@@ -79,70 +79,77 @@ public class SchlossSinkService extends SchlossReadThread<SchlossSink>{
     // Every timeout, update row count of the active sinks
     List<String> removals = Lists.newArrayList();
     KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
-    // Check if sink is inactive
     JSONArray params = new JSONArray();
-    CuratorFramework client = CuratorFrameworkFactory.builder()
-        .retryPolicy(new ExponentialBackoffRetry(1000, 10))
-        .connectString(kafkaService.getZKConnectString("gmb"))
-        .build();
-    client.start();
-    
-    for(String topic: _activeSinkTopics){
-      _log.info("Handling API Size update for topic: " + topic);
+    // Check if sink is inactive
+    CuratorFramework client = null;
+    try{
+      client = CuratorFrameworkFactory.builder()
+          .retryPolicy(new ExponentialBackoffRetry(1000, 30))
+          .connectString(kafkaService.getZKConnectString("gmb"))
+          .build();
+      client.start();
 
-      if(KafkaUtils.isSinkActive(topic)){
-         removals.add(topic);
-      }
-      // Get count from ZK
-      String bufferTopicSizePath = "/buffer/" + topic + "/size";
+      for(String topic: _activeSinkTopics){
+        _log.info("Handling API Size update for topic: " + topic);
 
-      String bufferTopicSizeLockPath = "/buffer/" + topic + "/size_lock";
-      long messageCount = 0;
-      try{
-        if(client.checkExists().forPath(bufferTopicSizeLockPath) == null){
-          client.create().creatingParentsIfNeeded().forPath(bufferTopicSizeLockPath); // Create lock before we try to acquire it.
+        if(KafkaUtils.isSinkActive(topic, client)){
+          removals.add(topic);
         }
-        InterProcessMutex sizeUpdateMutex = new InterProcessMutex(client, bufferTopicSizeLockPath);
-        if(sizeUpdateMutex.acquire(10, TimeUnit.SECONDS)){
-          try{
-            if(client.checkExists().forPath(bufferTopicSizePath) == null){
-              // No size yet. Ignore.
-              continue; // Move to next topic
-            }else{
-              messageCount = new BigInteger(client.getData().forPath(bufferTopicSizePath)).longValue();
-              _log.info("Found messageCount: " + messageCount + " for topic " + topic);
-            }
-          }finally{
-            sizeUpdateMutex.release();
-          }
-        } 
-      }catch(Exception e){
-        _log.error("Couldn't get messageCount from zk for topic: " + topic);
-      }
+        // Get count from ZK
+        String bufferTopicSizePath = "/buffer/" + topic + "/size";
 
-      _log.info("New topic size: " + topic + ":: " + messageCount);
-      if(messageCount > 0){
-        JSONObject topicSize = new JSONObject();
-        topicSize.put("relation_id", topic);
-        topicSize.put("size", messageCount);
-        params.add(topicSize);
+        String bufferTopicSizeLockPath = "/buffer/" + topic + "/size_lock";
+        long messageCount = 0;
+        try{
+          if(client.checkExists().forPath(bufferTopicSizeLockPath) == null){
+            client.create().creatingParentsIfNeeded().forPath(bufferTopicSizeLockPath); // Create lock before we try to acquire it.
+          }
+          InterProcessMutex sizeUpdateMutex = new InterProcessMutex(client, bufferTopicSizeLockPath);
+          if(sizeUpdateMutex.acquire(1, TimeUnit.MINUTES)){
+            try{
+              if(client.checkExists().forPath(bufferTopicSizePath) == null){
+                // No size yet. Ignore.
+                continue; // Move to next topic
+              }else{
+                messageCount = new BigInteger(client.getData().forPath(bufferTopicSizePath)).longValue();
+                _log.info("Found messageCount: " + messageCount + " for topic " + topic);
+              }
+            }finally{
+              sizeUpdateMutex.release();
+            }
+          } 
+        }catch(Exception e){
+          _log.error("Couldn't get messageCount from zk for topic: " + topic);
+        }
+
+        _log.info("New topic size: " + topic + ":: " + messageCount);
+        if(messageCount > 0){
+          JSONObject topicSize = new JSONObject();
+          topicSize.put("relation_id", topic);
+          topicSize.put("size", messageCount);
+          params.add(topicSize);
+        }
+      }
+      if(params.size() > 0){
+        JSONObject sizes = new JSONObject();
+        sizes.put("sizes", params);
+        try {
+          String path = "/relation/sizes_update";
+          _log.debug("Sending message: " + sizes.toString() + " to path: " + path);
+          RestAPIHelper.post(path, sizes.toString(), API_AUTH_TOKEN);
+        } catch (APIException e) {
+          _log.error("Failed updating topic size : " + sizes.toString());
+          e.printStackTrace();
+          //throw new APIException("Set size failed for relation: " + topic);
+        }
+        _log.info("Done handling API update for topics: " + activeSinkTopicsString);
+      }
+    }finally{
+      if(client != null){
+        client.close();
       }
     }
-    if(params.size() > 0){
-      JSONObject sizes = new JSONObject();
-      sizes.put("sizes", params);
-      try {
-        String path = "/relation/sizes_update";
-        _log.debug("Sending message: " + sizes.toString() + " to path: " + path);
-        RestAPIHelper.post(path, sizes.toString(), API_AUTH_TOKEN);
-      } catch (APIException e) {
-        _log.error("Failed updating topic size : " + sizes.toString());
-        e.printStackTrace();
-        //throw new APIException("Set size failed for relation: " + topic);
-      }
-      _log.info("Done handling API update for topics: " + activeSinkTopicsString);
-    }
-    
+
     if(removals.size() > 0){
       _log.info("Removing topics from active sinks: " + Joiner.on(',').join(removals));
       _activeSinkTopics.removeAll(removals);

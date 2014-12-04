@@ -71,8 +71,8 @@ public class SchlossSinkService extends SchlossReadThread<SchlossSink>{
     if(_activeSinkTopics.size() == 0){
       if(_ticker.tick()){
         _log.info("[sampled #" + _ticker.counter() + "] No active topics.");
-        return;
       }
+      return;
     }else{
       _log.info("Handling topic size updates: Active topics: " + activeSinkTopicsString);
     }
@@ -140,9 +140,9 @@ public class SchlossSinkService extends SchlossReadThread<SchlossSink>{
         e.printStackTrace();
         //throw new APIException("Set size failed for relation: " + topic);
       }
+      _log.info("Done handling API update for topics: " + activeSinkTopicsString);
     }
-    _log.info("Done handling API update for topics: " + activeSinkTopicsString);
-
+    
     if(removals.size() > 0){
       _log.info("Removing topics from active sinks: " + Joiner.on(',').join(removals));
       _activeSinkTopics.removeAll(removals);

@@ -190,8 +190,7 @@ public class S3Util {
     try {
       return new Pair<File,BufferedReader>(input.getValue0(), new BufferedReader(new InputStreamReader(new GZIPInputStream(input.getValue1()), "UTF-8")));
     } catch ( IOException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
+      _log.error(ExceptionUtils.getStackTrace(e));
     }
     return null;
   }

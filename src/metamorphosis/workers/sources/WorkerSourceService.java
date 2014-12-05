@@ -72,7 +72,7 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
           skipped += 1;
           continue;
         }
-        //_log.info("Sending message " + workerQueueMessage + " to queue: " + topic);
+        _log.info("Sending message " + workerQueueMessage.substring(0, 20) + " to queue: " + topicQueue);
         List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
         bytesReceived += messageLength;
         messages.add(new KeyedMessage<Integer,String>(topicQueue,workerQueueMessage));

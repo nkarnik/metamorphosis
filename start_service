@@ -78,7 +78,7 @@ else
   puts "Unsupported service: #{service}"
   exit
 end
-kafka_consumer_timeout = "10000"
+kafka_consumer_timeout = "30000"
 
 #To allow debugging from eclipse while running on vagrant/test/prod. add at the start of -Dexec.args="
 jvm_debug=""

@@ -2,6 +2,7 @@ package metamorphosis.schloss.test;
 
 import static org.junit.Assert.assertEquals;
 
+import java.math.BigInteger;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -11,6 +12,9 @@ import metamorphosis.utils.Config;
 import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;
 
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.log4j.Logger;
 import org.junit.Before;
 import org.junit.Ignore;
@@ -108,13 +112,20 @@ public class SchlossTest {
   
   @Test 
   @Ignore("Requires local API to be running. TODO: Use MockAPI")
-  public void testAPITopicSizeUpdate() throws InterruptedException, ExecutionException{
+  public void testAPITopicSizeUpdate() throws Exception{
+    Config.singleton().put("update_sizes_to_api", true);
+    Config.singleton().put("api.port", 5000);
+    // Write the size to ZK
+    CuratorFramework client = CuratorFrameworkFactory.builder()
+        .retryPolicy(new ExponentialBackoffRetry(1000, 10))
+        .connectString(_localKakfaService.getZKConnectString("gmb"))
+        .build();
+    client.start();
     String sinkTopic = "r000001__homepages_v1";
-    int numMessages = 100;
-    for(int i = 0; i < numMessages; i++){
-      _localKakfaService.sendMessage(sinkTopic, "Test message " + i);  
-    }
-    
+    String bufferTopicSizePath = "/buffer/" + sinkTopic + "/size";
+
+    long numMessages = 101;
+    client.create().creatingParentsIfNeeded().forPath(bufferTopicSizePath, BigInteger.valueOf(numMessages).toByteArray());
 
     _log.info("Sending sink message");
 

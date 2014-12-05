@@ -28,7 +28,7 @@ public abstract class WorkerSink implements Worker {
    * @param queueNumber
    * @return
    */
-  public abstract int sink(ConsumerIterator<String, String> sinkTopicIterator, int queueNumber, boolean sinkUntilTimeout);
+  public abstract long sink(ConsumerIterator<String, String> sinkTopicIterator, int queueNumber, boolean sinkUntilTimeout);
 
 
 

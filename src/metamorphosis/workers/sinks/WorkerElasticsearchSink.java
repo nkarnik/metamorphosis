@@ -44,9 +44,9 @@ public class WorkerElasticsearchSink extends WorkerSink {
   }
 
   @Override
-  public int sink(ConsumerIterator<String, String> sinkTopicIterator, int queueNumber, boolean sinkUntilTimeout) {
+  public long sink(ConsumerIterator<String, String> sinkTopicIterator, int queueNumber, boolean sinkUntilTimeout) {
     _log.info("Entering elasticsearch sink for topic: " + _topic);
-    int sunkTuples = 0;
+    long sunkTuples = 0;
     BulkRequestBuilder prepareBulk = _client.prepareBulk();
     try{
       while (sinkTopicIterator.hasNext()) {

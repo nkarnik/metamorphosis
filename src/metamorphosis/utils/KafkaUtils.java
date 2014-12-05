@@ -87,22 +87,17 @@ public class KafkaUtils {
     return props;
   }
   
-  public static  boolean isSinkActive(String topic) {
+  /**
+   * 
+   * @param topic
+   * @param client, must be started
+   * @return
+   */
+  public static  boolean isSinkActive(String topic, CuratorFramework client) {
     boolean done = false;
     _log.debug("Performing zk check...");
-    KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
-    CuratorFramework client = null;
     try{
-      
-      client = CuratorFrameworkFactory.builder()
-          //.namespace("gmb")
-          .retryPolicy(new ExponentialBackoffRetry(1000, 5))
-          .connectString(kafkaService.getZKConnectString("gmb"))
-          .build();
-      client.start();
-      
       String bufferTopicPath = "/buffer/" + topic + "/status/done";
-      
       if(client.checkExists().forPath(bufferTopicPath) == null){
         // Yes, we do want to process it.
         _log.debug("Done path (" + bufferTopicPath+ ") not found." );
@@ -112,15 +107,9 @@ public class KafkaUtils {
         _log.info("Done path (" + bufferTopicPath+ ") found.");
         done = true;
       }
-
     }catch(Exception e){
       _log.error("SinkService crashed when trying to check for zk done message");
       e.printStackTrace();
-      throw new RuntimeException(e);
-    }finally{
-      if(client != null){
-        client.close();
-      }
     }
     _log.debug("Done with zk check...");
     return done;

@@ -37,7 +37,7 @@ public class WorkerS3Sink extends WorkerSink {
 
   private int _shardNum;
 
-  private int _numMessagesThisShard;
+  private long _numMessagesThisShard;
 
   private String _gzFilePath;
 
@@ -67,8 +67,8 @@ public class WorkerS3Sink extends WorkerSink {
   }
 
   @Override
-  public int sink(ConsumerIterator<String, String> iterator, int queueNumber, boolean sinkUntilTimeout) {
-    int sunkTuples = 0;
+  public long sink(ConsumerIterator<String, String> iterator, int queueNumber, boolean sinkUntilTimeout) {
+    long sunkTuples = 0;
     int shardNum = (queueNumber + 1) * 10000 + _shardNum;
     
     _shardFull = _shardPath + _shardPrefix + shardNum + ".gz";
@@ -127,7 +127,7 @@ public class WorkerS3Sink extends WorkerSink {
   
 
   
-  protected boolean maybeFlush(boolean forceFlush, int sunkTuples) {
+  protected boolean maybeFlush(boolean forceFlush, long sunkTuples) {
     _log.debug("Fetched " +sunkTuples + " so far...");
     
     if (sunkTuples > 0 && (forceFlush || sunkTuples == _numMessagesThisShard)) {

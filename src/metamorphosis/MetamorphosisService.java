@@ -176,7 +176,7 @@ public class MetamorphosisService {
     Config.singleton().put("kafka.zookeeper.connect", zkHost + ":" + zkPort + "/kafka");
     Config.singleton().put("gmb.zookeeper.connect", zkHost + ":" + zkPort + "/gmb");
     Config.singleton().put("elasticsearch.hosts", options.getOptionValue("elasticsearch.hosts"));
-    
+    Config.singleton().put("update_sizes_to_api", true); // Only update sizes when running as a service, not during tests.
     String apiHost;
     switch(env){
     case "test":

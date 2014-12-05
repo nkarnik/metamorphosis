@@ -31,6 +31,7 @@ import metamorphosis.utils.KafkaUtils;
 import metamorphosis.utils.Utils;
 import net.sf.json.JSONObject;
 
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.log4j.Logger;
 
 public abstract class WorkerService<T extends Worker> {
@@ -132,7 +133,7 @@ public abstract class WorkerService<T extends Worker> {
                     processMessage(poppedMessage);
                   }catch(Exception e){
                     _log.error("Process message error!! ");
-                    e.printStackTrace();
+                    _log.error(ExceptionUtils.getStackTrace(e));
                     return false;
                   }
                   _log.debug("Completed processing message: " + poppedMessage.toString());

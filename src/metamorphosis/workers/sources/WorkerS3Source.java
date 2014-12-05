@@ -9,6 +9,7 @@ import metamorphosis.utils.s3.S3Exception;
 import metamorphosis.utils.s3.S3Util;
 import net.sf.json.JSONObject;
 
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.log4j.Logger;
 import org.javatuples.Pair;
 
@@ -52,8 +53,7 @@ public class WorkerS3Source extends WorkerSource {
       try {
         _bufferedShardReader.close();
       } catch (IOException e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
+        _log.error(ExceptionUtils.getStackTrace(e));
       }
     }
   }

@@ -23,6 +23,7 @@ import kafka.utils.ZKStringSerializer$;
 import metamorphosis.utils.KafkaUtils;
 
 import org.I0Itec.zkclient.ZkClient;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.curator.test.TestingServer;
 import org.apache.log4j.Logger;
 
@@ -55,7 +56,8 @@ public class LocalKafkaService extends KafkaService{
       _zkServer = new TestingServer(TestUtils.choosePort());
     } catch (Exception e) {
       // TODO Auto-generated catch block
-      e.printStackTrace();
+      _log.error(ExceptionUtils.getStackTrace(e));
+
     }
     ZkClient zkClient = new ZkClient(_zkServer.getConnectString(), 30000, 30000, ZKStringSerializer$.MODULE$);
     zkClient.waitUntilConnected();
@@ -199,7 +201,8 @@ public class LocalKafkaService extends KafkaService{
         _zkServer.stop();
       } catch (IOException e) {
         // TODO Auto-generated catch block
-        e.printStackTrace();
+        _log.error(ExceptionUtils.getStackTrace(e));
+
       }
     }
     for(KafkaServer server : _servers){

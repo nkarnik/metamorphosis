@@ -10,6 +10,7 @@ import metamorphosis.schloss.sources.SchlossSourceSevice;
 import metamorphosis.utils.Config;
 import metamorphosis.utils.Utils;
 
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.log4j.Logger;
 
 public class SchlossService {
@@ -67,8 +68,8 @@ public class SchlossService {
         _sinkReadThread.get();
       }
     } catch (InterruptedException | ExecutionException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
+      _log.error(ExceptionUtils.getStackTrace(e));
+
     }finally{
       _log.info("Shutdown complete");
     }

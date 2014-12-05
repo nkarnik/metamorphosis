@@ -14,6 +14,7 @@ import metamorphosis.utils.Config;
 import metamorphosis.workers.WorkerService;
 import net.sf.json.JSONObject;
 
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.recipes.locks.InterProcessMutex;
@@ -25,10 +26,10 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 
 public class WorkerSourceService extends WorkerService<WorkerSource> {
-  
+
   private static int MAX_MESSAGE_LENGTH = 100000;
   private Logger _log = Logger.getLogger(WorkerSourceService.class);
-  
+
   public WorkerSourceService(String sourceTopic, KafkaService kafkaService) {
     super(sourceTopic, kafkaService, new WorkerSourceFactory());
   }
@@ -105,19 +106,19 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
       int numBrokers = brokerList.split(",").length;
       String ourQueue = Config.singleton().getOrException(MetamorphosisService.workerSourceQueue);
       KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
-      
-     client = CuratorFrameworkFactory.builder()
-                //.namespace("gmb")
-                .retryPolicy(new RetryOneTime(1000))
-                .connectString(kafkaService.getZKConnectString("gmb"))
-                .build();
+
+      client = CuratorFrameworkFactory.builder()
+          //.namespace("gmb")
+          .retryPolicy(new RetryOneTime(1000))
+          .connectString(kafkaService.getZKConnectString("gmb"))
+          .build();
       client.start();
       // ZkClient client = kafkaService.createGmbZkClient();
       _log.debug("Client connecting ...");
       String bufferTopicPath = "/buffer/" + topic + "/status";
       String lockPath = bufferTopicPath + "/lock";
       String workersPath = bufferTopicPath + "/workers";
-      
+
       _log.debug("Client started: ");
       if(client.checkExists().forPath(bufferTopicPath) == null){
         _log.debug("Creating path: " + bufferTopicPath);
@@ -125,18 +126,18 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
         client.create().creatingParentsIfNeeded().forPath(workersPath);
         _log.debug("Created path: " + bufferTopicPath);
       }
-      
+
       mutex = new InterProcessMutex(client, lockPath);
 
       if(mutex.acquire(5,TimeUnit.SECONDS)){
         _log.debug("Lock acquired");
-        
+
         List<String> workersDone = client.getChildren().forPath(workersPath);
         if(workersDone == null || workersDone.size() < numBrokers - 1){
           //Not the last worker to finish. write a worker done
           _log.info("Not last, writing to " + bufferTopicPath + "/workers/" + ourQueue);
           client.create().creatingParentsIfNeeded().forPath(bufferTopicPath + "/workers/" + ourQueue);
-          
+
         }else{
           // Last to finish. Write the path that gmb will read
           String zNodePath = bufferTopicPath + "/done"; 
@@ -148,16 +149,12 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
       _log.debug("Lock released");
     } catch (Exception e) {
       _log.error("Couldn't process schloss_message");
-      e.printStackTrace();
-      throw new RuntimeException(e);
+      _log.error(ExceptionUtils.getStackTrace(e));
     } finally{
-      if(mutex.isAcquiredInThisProcess()){
-        try {
-          mutex.release();
-        } catch (Exception e) {
-          // TODO Auto-generated catch block
-          e.printStackTrace();
-        }
+      try {
+        mutex.release();
+      } catch (Exception e) {
+        _log.error(ExceptionUtils.getStackTrace(e));
       }
       if(client != null){
         client.close();

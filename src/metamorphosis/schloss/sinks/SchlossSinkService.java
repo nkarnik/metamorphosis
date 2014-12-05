@@ -3,7 +3,6 @@ package metamorphosis.schloss.sinks;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 
 import kafka.producer.KeyedMessage;
 import kafka.producer.Producer;
@@ -19,9 +18,9 @@ import metamorphosis.utils.RestAPIHelper;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONObject;
 
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
-import org.apache.curator.framework.recipes.locks.InterProcessMutex;
 import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.log4j.Logger;
 
@@ -128,7 +127,8 @@ public class SchlossSinkService extends SchlossReadThread<SchlossSink>{
           RestAPIHelper.post(path, sizes.toString(), API_AUTH_TOKEN);
         } catch (APIException e) {
           _log.error("Failed updating topic size : " + sizes.toString());
-          e.printStackTrace();
+          _log.error(ExceptionUtils.getStackTrace(e));
+
           //throw new APIException("Set size failed for relation: " + topic);
         }
         _log.info("Done handling API update for topics: " + activeSinkTopicsString);

@@ -21,6 +21,7 @@ import metamorphosis.utils.Utils;
 import metamorphosis.utils.s3.FileLockUtil.MultiLock;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.log4j.Logger;
 import org.javatuples.Pair;
 import org.jets3t.service.S3ServiceException;
@@ -368,8 +369,8 @@ public class S3Util {
       try {
         s3ObjInputStreamCached.getValue1().close();
       } catch (IOException e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
+        _log.error(ExceptionUtils.getStackTrace(e));
+
       }
       s3ObjInputStreamCached.getValue0().delete();
     }

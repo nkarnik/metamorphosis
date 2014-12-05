@@ -149,6 +149,6 @@ public class WorkerElasticsearchSinkTest {
     totalSunk = response.getCount();
     client.close();
     _log.info("Final number of messages in elasticsearch: " + totalSunk);
-    assertEquals(9881, totalSunk);
+    assertEquals(10000, totalSunk);
   }
 }

@@ -98,26 +98,15 @@ public class SchlossSinkService extends SchlossReadThread<SchlossSink>{
         // Get count from ZK
         String bufferTopicSizePath = "/buffer/" + topic + "/size";
 
-        String bufferTopicSizeLockPath = "/buffer/" + topic + "/size_lock";
         long messageCount = 0;
         try{
-          if(client.checkExists().forPath(bufferTopicSizeLockPath) == null){
-            client.create().creatingParentsIfNeeded().forPath(bufferTopicSizeLockPath); // Create lock before we try to acquire it.
+          if(client.checkExists().forPath(bufferTopicSizePath) == null){
+            // No size yet. Ignore.
+            continue; // Move to next topic
+          }else{
+            messageCount = new BigInteger(client.getData().forPath(bufferTopicSizePath)).longValue();
+            _log.info("Found messageCount: " + messageCount + " for topic " + topic);
           }
-          InterProcessMutex sizeUpdateMutex = new InterProcessMutex(client, bufferTopicSizeLockPath);
-          if(sizeUpdateMutex.acquire(1, TimeUnit.MINUTES)){
-            try{
-              if(client.checkExists().forPath(bufferTopicSizePath) == null){
-                // No size yet. Ignore.
-                continue; // Move to next topic
-              }else{
-                messageCount = new BigInteger(client.getData().forPath(bufferTopicSizePath)).longValue();
-                _log.info("Found messageCount: " + messageCount + " for topic " + topic);
-              }
-            }finally{
-              sizeUpdateMutex.release();
-            }
-          } 
         }catch(Exception e){
           _log.error("Couldn't get messageCount from zk for topic: " + topic);
         }

@@ -18,6 +18,7 @@ import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.recipes.locks.InterProcessMutex;
+import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.curator.retry.RetryOneTime;
 import org.apache.log4j.Logger;
 import org.javatuples.Pair;
@@ -109,7 +110,7 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
 
       client = CuratorFrameworkFactory.builder()
           //.namespace("gmb")
-          .retryPolicy(new RetryOneTime(1000))
+          .retryPolicy(new ExponentialBackoffRetry(1000, 100))
           .connectString(kafkaService.getZKConnectString("gmb"))
           .build();
       client.start();
@@ -129,33 +130,32 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
 
       mutex = new InterProcessMutex(client, lockPath);
 
-      if(mutex.acquire(5,TimeUnit.SECONDS)){
-        _log.debug("Lock acquired");
-
+      mutex.acquire();
+      _log.debug("Lock acquired");
+      try{
         List<String> workersDone = client.getChildren().forPath(workersPath);
         if(workersDone == null || workersDone.size() < numBrokers - 1){
           //Not the last worker to finish. write a worker done
           _log.info("Not last, writing to " + bufferTopicPath + "/workers/" + ourQueue);
           client.create().creatingParentsIfNeeded().forPath(bufferTopicPath + "/workers/" + ourQueue);
-
+          
         }else{
           // Last to finish. Write the path that gmb will read
           String zNodePath = bufferTopicPath + "/done"; 
           client.create().creatingParentsIfNeeded().forPath(zNodePath);
           _log.info("Create znode: " + zNodePath);
         }
+      }finally{
+        try {
+          mutex.release();
+        } catch (Exception e) {
+          _log.error(ExceptionUtils.getStackTrace(e));
+        }
       }
-      mutex.release();
-      _log.debug("Lock released");
     } catch (Exception e) {
       _log.error("Couldn't process schloss_message");
       _log.error(ExceptionUtils.getStackTrace(e));
     } finally{
-      try {
-        mutex.release();
-      } catch (Exception e) {
-        _log.error(ExceptionUtils.getStackTrace(e));
-      }
       if(client != null){
         client.close();
       }

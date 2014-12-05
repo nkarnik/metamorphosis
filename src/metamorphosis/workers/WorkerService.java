@@ -119,6 +119,9 @@ public abstract class WorkerService<T extends Worker> {
               _log.info("Processing a schloss_message for topic: " + topic + ". Awaiting " + topicFutures.size() + " futures.");
               
               for(Future<Boolean> future : topicFutures){
+                if(future.isDone() || future.isCancelled()){
+                  continue; 
+                }
                 future.get(); // We don't really care about the output. We just need to know that it is done.
               }
               _log.info("Done waiting on futures. Finally processing the schloss message... ");

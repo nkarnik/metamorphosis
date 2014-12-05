@@ -47,7 +47,7 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
     props.put("metadata.broker.list", Joiner.on(",").join(_kafkaService.getSeedBrokers()));
     props.put("serializer.class", "kafka.serializer.StringEncoder");
     props.put("partitioner.class", "kafka.producer.DefaultPartitioner");
-    props.put("partitioner.type", "async");
+    props.put("producer.type", "async");
     props.put("queue.buffering.max.ms", "3000");
     props.put("queue.buffering.max.messages", "200");
     props.put("compression.codec", "snappy");

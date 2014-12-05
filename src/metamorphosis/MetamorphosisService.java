@@ -17,6 +17,7 @@ import org.apache.commons.cli.GnuParser;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.log4j.Logger;
 
 public class MetamorphosisService {
@@ -45,7 +46,8 @@ public class MetamorphosisService {
         try {
           cleanup();
         } catch (Exception e) {
-          e.printStackTrace();
+          _log.error(ExceptionUtils.getStackTrace(e));
+
         }
       }      
     }));
@@ -176,6 +178,7 @@ public class MetamorphosisService {
     Config.singleton().put("kafka.zookeeper.connect", zkHost + ":" + zkPort + "/kafka");
     Config.singleton().put("gmb.zookeeper.connect", zkHost + ":" + zkPort + "/gmb");
     Config.singleton().put("elasticsearch.hosts", options.getOptionValue("elasticsearch.hosts"));
+    Config.singleton().put("tmp_location","/mnt/shards/");
     Config.singleton().put("update_sizes_to_api", true); // Only update sizes when running as a service, not during tests.
     String apiHost;
     switch(env){
@@ -308,7 +311,8 @@ public class MetamorphosisService {
       return input;
     } catch (IOException e) {
       // TODO Auto-generated catch block
-      e.printStackTrace();
+      _log.error(ExceptionUtils.getStackTrace(e));
+
     }
     return null;
   }

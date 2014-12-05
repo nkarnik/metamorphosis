@@ -14,9 +14,11 @@ import metamorphosis.utils.Config;
 import metamorphosis.workers.WorkerService;
 import net.sf.json.JSONObject;
 
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.recipes.locks.InterProcessMutex;
+import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.curator.retry.RetryOneTime;
 import org.apache.log4j.Logger;
 import org.javatuples.Pair;
@@ -25,10 +27,10 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 
 public class WorkerSourceService extends WorkerService<WorkerSource> {
-  
+
   private static int MAX_MESSAGE_LENGTH = 100000;
   private Logger _log = Logger.getLogger(WorkerSourceService.class);
-  
+
   public WorkerSourceService(String sourceTopic, KafkaService kafkaService) {
     super(sourceTopic, kafkaService, new WorkerSourceFactory());
   }
@@ -45,11 +47,12 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
     props.put("metadata.broker.list", Joiner.on(",").join(_kafkaService.getSeedBrokers()));
     props.put("serializer.class", "kafka.serializer.StringEncoder");
     props.put("partitioner.class", "kafka.producer.DefaultPartitioner");
-    props.put("partitioner.type", "async");
-    props.put("queue.buffering.max.ms", "3000");
-    props.put("queue.buffering.max.messages", "200");
+    //props.put("producer.type", "async");
+    props.put("queue.buffering.max.ms", "1000");
+    props.put("batch.num.messages","10");
+    props.put("queue.buffering.max.messages", "100");
     props.put("compression.codec", "snappy");
-    props.put("request.required.acks", "1");
+    //props.put("request.required.acks", "1");
 
     Producer<Integer, String> producer = new Producer<Integer,String>(new ProducerConfig(props));
 
@@ -59,7 +62,9 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
     int skipped = 0;
     int bytesReceived = 0;
     try{
+      
       for( String workerQueueMessage : messageIterator) {
+        
         int messageLength = workerQueueMessage.getBytes().length;
 
         if(messageLength >=  MAX_MESSAGE_LENGTH){
@@ -67,7 +72,7 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
           skipped += 1;
           continue;
         }
-        //_log.info("Sending message " + workerQueueMessage + " to queue: " + topic);
+        //_log.info("Sending message " + workerQueueMessage.substring(0, 20) + " to queue: " + topicQueue);
         List<KeyedMessage<Integer, String>> messages = Lists.newArrayList();
         bytesReceived += messageLength;
         messages.add(new KeyedMessage<Integer,String>(topicQueue,workerQueueMessage));
@@ -105,19 +110,19 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
       int numBrokers = brokerList.split(",").length;
       String ourQueue = Config.singleton().getOrException(MetamorphosisService.workerSourceQueue);
       KafkaService kafkaService = Config.singleton().getOrException("kafka.service");
-      
-     client = CuratorFrameworkFactory.builder()
-                //.namespace("gmb")
-                .retryPolicy(new RetryOneTime(1000))
-                .connectString(kafkaService.getZKConnectString("gmb"))
-                .build();
+
+      client = CuratorFrameworkFactory.builder()
+          //.namespace("gmb")
+          .retryPolicy(new ExponentialBackoffRetry(1000, 100))
+          .connectString(kafkaService.getZKConnectString("gmb"))
+          .build();
       client.start();
       // ZkClient client = kafkaService.createGmbZkClient();
       _log.debug("Client connecting ...");
       String bufferTopicPath = "/buffer/" + topic + "/status";
       String lockPath = bufferTopicPath + "/lock";
       String workersPath = bufferTopicPath + "/workers";
-      
+
       _log.debug("Client started: ");
       if(client.checkExists().forPath(bufferTopicPath) == null){
         _log.debug("Creating path: " + bufferTopicPath);
@@ -125,12 +130,12 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
         client.create().creatingParentsIfNeeded().forPath(workersPath);
         _log.debug("Created path: " + bufferTopicPath);
       }
-      
+
       mutex = new InterProcessMutex(client, lockPath);
 
-      if(mutex.acquire(5,TimeUnit.SECONDS)){
-        _log.debug("Lock acquired");
-        
+      mutex.acquire();
+      _log.debug("Lock acquired");
+      try{
         List<String> workersDone = client.getChildren().forPath(workersPath);
         if(workersDone == null || workersDone.size() < numBrokers - 1){
           //Not the last worker to finish. write a worker done
@@ -143,22 +148,17 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
           client.create().creatingParentsIfNeeded().forPath(zNodePath);
           _log.info("Create znode: " + zNodePath);
         }
-      }
-      mutex.release();
-      _log.debug("Lock released");
-    } catch (Exception e) {
-      _log.error("Couldn't process schloss_message");
-      e.printStackTrace();
-      throw new RuntimeException(e);
-    } finally{
-      if(mutex.isAcquiredInThisProcess()){
+      }finally{
         try {
           mutex.release();
         } catch (Exception e) {
-          // TODO Auto-generated catch block
-          e.printStackTrace();
+          _log.error(ExceptionUtils.getStackTrace(e));
         }
       }
+    } catch (Exception e) {
+      _log.error("Couldn't process schloss_message");
+      _log.error(ExceptionUtils.getStackTrace(e));
+    } finally{
       if(client != null){
         client.close();
       }

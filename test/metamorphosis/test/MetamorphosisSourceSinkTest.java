@@ -19,6 +19,7 @@ import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;
 
 import org.I0Itec.zkclient.ZkClient;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.log4j.Logger;
 import org.jets3t.service.S3ServiceException;
 import org.jets3t.service.model.S3Object;
@@ -214,7 +215,8 @@ public class MetamorphosisSourceSinkTest {
         _log.info("Received a total of " + totalSunk + " bytes");
       } catch (IOException e) {
         // TODO Auto-generated catch block
-        e.printStackTrace();
+        _log.error(ExceptionUtils.getStackTrace(e));
+
       }
         
     }
@@ -222,8 +224,8 @@ public class MetamorphosisSourceSinkTest {
     assertEquals(976, totalSunk);
       
     } catch (S3ServiceException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
+      _log.error(ExceptionUtils.getStackTrace(e));
+
     }
     
     

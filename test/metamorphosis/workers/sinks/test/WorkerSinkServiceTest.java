@@ -18,6 +18,7 @@ import metamorphosis.workers.sinks.WorkerSinkService;
 import net.sf.json.util.JSONBuilder;
 import net.sf.json.util.JSONStringer;
 
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.RetryOneTime;
@@ -151,13 +152,14 @@ public class WorkerSinkServiceTest {
           totalSunk += sunk.length;
           _log.info("Received a total of " + totalSunk + " bytes");
         } catch (IOException e) {
-          // TODO Auto-generated catch block
-          e.printStackTrace();
+          _log.error(ExceptionUtils.getStackTrace(e));
+
         }
       }
     } catch (S3ServiceException e) {
       // TODO Auto-generated catch block
-      e.printStackTrace();
+      _log.error(ExceptionUtils.getStackTrace(e));
+
     }
     _log.info("Final number of messages on s3: " + totalSunk);
     assertEquals(BATCHES * PER_BATCH, totalSunk);

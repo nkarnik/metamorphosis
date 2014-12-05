@@ -10,6 +10,7 @@ import java.util.zip.GZIPOutputStream;
 import kafka.consumer.ConsumerIterator;
 import kafka.consumer.ConsumerTimeoutException;
 import kafka.message.MessageAndMetadata;
+import metamorphosis.utils.Config;
 import metamorphosis.utils.KafkaUtils;
 import metamorphosis.utils.s3.S3Exception;
 import metamorphosis.utils.s3.S3Util;
@@ -72,11 +73,11 @@ public class WorkerS3Sink extends WorkerSink {
     int shardNum = (queueNumber + 1) * 10000 + _shardNum;
     
     _shardFull = _shardPath + _shardPrefix + shardNum + ".gz";
-    _gzFilePath = "/mnt/shards/" + _shardFull;
-    
+    String tmpLocation = Config.getOrDefault("tmp_location", "/tmp");
+    _gzFilePath = tmpLocation + "/" + _shardFull;
 
     try{
-      File parentDir = new File("/mnt/shards/" + _shardPath);
+      File parentDir = new File(tmpLocation + "/" + _shardPath);
       parentDir.mkdirs();
       _writer = new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new FileOutputStream(_gzFilePath)), "UTF-8"));
       _log.debug("Created File locally: " + _gzFilePath);

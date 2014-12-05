@@ -24,6 +24,7 @@ import metamorphosis.workers.WorkerService;
 import net.sf.json.JSONObject;
 
 import org.apache.commons.lang.NotImplementedException;
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.recipes.locks.InterProcessMutex;
@@ -59,7 +60,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       
       client = CuratorFrameworkFactory.builder()
           //.namespace("gmb")
-          .retryPolicy(new ExponentialBackoffRetry(1000, 10))
+          .retryPolicy(new ExponentialBackoffRetry(1000, 100))
           .connectString(kafkaService.getZKConnectString("gmb"))
           .build();
       client.start();
@@ -79,8 +80,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
 
     }catch(Exception e){
       _log.error("SinkService crashed when trying to check for zk done message");
-      e.printStackTrace();
-      throw new RuntimeException(e);
+      _log.error(ExceptionUtils.getStackTrace(e));
     }finally{
       if(client != null){
         client.close();
@@ -116,7 +116,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       _log.info("Sunk #" + sunkTuples + " tuples for topic: " + topic);
       try{
         client = CuratorFrameworkFactory.builder()
-            .retryPolicy(new ExponentialBackoffRetry(1000, 10))
+            .retryPolicy(new ExponentialBackoffRetry(1000, 100))
             .connectString(kafkaService.getZKConnectString("gmb"))
             .build();
         client.start();
@@ -129,24 +129,22 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
         }
         
         InterProcessMutex sizeUpdateMutex = new InterProcessMutex(client, bufferTopicSizeLockPath);
-        if(sizeUpdateMutex.acquire(10, TimeUnit.SECONDS)){
-          try{
-            if(client.checkExists().forPath(bufferTopicSizePath) == null){
-              // First to write size.
-              client.create().creatingParentsIfNeeded().forPath(bufferTopicSizePath, BigInteger.valueOf(sunkTuples).toByteArray());
-            }else{
-              long currentCount = new BigInteger(client.getData().forPath(bufferTopicSizePath)).longValue();
-              currentCount += sunkTuples;
-              client.setData().forPath(bufferTopicSizePath, BigInteger.valueOf(currentCount).toByteArray());
-            }
-          }finally{
-            sizeUpdateMutex.release();
+        sizeUpdateMutex.acquire();
+        try{
+          if(client.checkExists().forPath(bufferTopicSizePath) == null){
+            // First to write size.
+            client.create().creatingParentsIfNeeded().forPath(bufferTopicSizePath, BigInteger.valueOf(sunkTuples).toByteArray());
+          }else{
+            long currentCount = new BigInteger(client.getData().forPath(bufferTopicSizePath)).longValue();
+            currentCount += sunkTuples;
+            client.setData().forPath(bufferTopicSizePath, BigInteger.valueOf(currentCount).toByteArray());
           }
+        }finally{
+          sizeUpdateMutex.release();
         }
       }catch(Exception e){
         _log.error("Couldn't write size to topic");
-        e.printStackTrace();
-        throw new RuntimeException(e);
+        _log.error(ExceptionUtils.getStackTrace(e));
       }finally{
         if(client != null){
           client.close();

@@ -19,11 +19,9 @@ import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.serializer.Decoder;
 import kafka.serializer.StringDecoder;
 import kafka.utils.VerifiableProperties;
-import metamorphosis.kafka.KafkaService;
 
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.curator.framework.CuratorFramework;
-import org.apache.curator.framework.CuratorFrameworkFactory;
-import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.log4j.Logger;
 
 public class KafkaUtils {
@@ -62,7 +60,7 @@ public class KafkaUtils {
       }
     }
     if (returnMetaData == null){
-      throw new RuntimeException("No partition (" + partition + ") found for " + topic);
+      _log.error("No partition (" + partition + ") found for " + topic);
     }
     return returnMetaData;
   }
@@ -109,7 +107,8 @@ public class KafkaUtils {
       }
     }catch(Exception e){
       _log.error("SinkService crashed when trying to check for zk done message");
-      e.printStackTrace();
+      _log.error(ExceptionUtils.getStackTrace(e));
+
     }
     _log.debug("Done with zk check...");
     return done;

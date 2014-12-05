@@ -62,7 +62,7 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
     int skipped = 0;
     int bytesReceived = 0;
     try{
-      _log.info("Entering gzbufferedIterator now for message: " + poppedMessage);
+      
       for( String workerQueueMessage : messageIterator) {
         
         int messageLength = workerQueueMessage.getBytes().length;

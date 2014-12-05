@@ -33,7 +33,6 @@ import net.sf.json.JSONObject;
 
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.log4j.Logger;
-import org.elasticsearch.common.base.Joiner;
 
 public abstract class WorkerService<T extends Worker> {
   
@@ -117,14 +116,13 @@ public abstract class WorkerService<T extends Worker> {
             _log.debug("Futures after cleanup: " + topicFutures.size());
             if(poppedMessage.containsKey("schloss_message")){
               // Wait on all currently running worker messages for this topic.
-              _log.info("Processing a schloss_message for topic: " + topic + ". Awaiting " + topicFutures.size() + " futures. List: " + Joiner.on(",").join(topicFutures));
+              _log.info("Processing a schloss_message for topic: " + topic + ". Awaiting " + topicFutures.size() + " futures.");
               
               for(Future<Boolean> future : topicFutures){
                 if(future.isDone() || future.isCancelled()){
                   continue; 
                 }
                 future.get(); // We don't really care about the output. We just need to know that it is done.
-                _log.info("Future was completed: " + future);
               }
               _log.info("Done waiting on futures. Finally processing the schloss message... ");
               processSchlossMessage(poppedMessage);
@@ -133,7 +131,7 @@ public abstract class WorkerService<T extends Worker> {
               Future<Boolean> topicFuture = _executorPool.submit(new Callable<Boolean>(){
                 @Override
                 public Boolean call() {
-                  _log.info("Processing message: " + poppedMessage.toString());
+                  _log.debug("Processing message: " + poppedMessage.toString());
                   try{
                     processMessage(poppedMessage);
                   }catch(Exception e){
@@ -141,7 +139,7 @@ public abstract class WorkerService<T extends Worker> {
                     _log.error(ExceptionUtils.getStackTrace(e));
                     return false;
                   }
-                  _log.info("Completed processing message: " + poppedMessage.toString());
+                  _log.debug("Completed processing message: " + poppedMessage.toString());
                   return true;
                 }
               });

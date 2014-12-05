@@ -49,7 +49,8 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
     props.put("partitioner.class", "kafka.producer.DefaultPartitioner");
     props.put("producer.type", "async");
     props.put("queue.buffering.max.ms", "1000");
-    props.put("queue.buffering.max.messages", "10");
+    props.put("batch.num.messages","10");
+    props.put("queue.buffering.max.messages", "100");
     props.put("compression.codec", "snappy");
     props.put("request.required.acks", "1");
 
@@ -61,7 +62,9 @@ public class WorkerSourceService extends WorkerService<WorkerSource> {
     int skipped = 0;
     int bytesReceived = 0;
     try{
+      
       for( String workerQueueMessage : messageIterator) {
+        
         int messageLength = workerQueueMessage.getBytes().length;
 
         if(messageLength >=  MAX_MESSAGE_LENGTH){

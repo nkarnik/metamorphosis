@@ -8,6 +8,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
@@ -17,9 +18,11 @@ import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import metamorphosis.utils.Config;
 import metamorphosis.utils.Utils;
 import metamorphosis.utils.s3.FileLockUtil.MultiLock;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.log4j.Logger;
@@ -178,13 +181,19 @@ public class S3Util {
   
   
   
-  public static Pair<File,BufferedReader> getCachedGzipFileReader(String bucket, String key) throws IOException, InterruptedException, S3Exception {
+  public static Pair<File,BufferedReader> getCachedGzipFileReader(String bucket, String key) {
     return getCachedGzipFileReader(bucket, key, tempDir() + "/s3cache");
   }
   
-  public static Pair<File,BufferedReader> getCachedGzipFileReader(String bucket, String key, String root) throws IOException, InterruptedException, S3Exception {
+  public static Pair<File,BufferedReader> getCachedGzipFileReader(String bucket, String key, String root){
     Pair<File,InputStream> input = getS3ObjInputStreamCached(bucket, key, root);
-    return new Pair<File,BufferedReader>(input.getValue0(), new BufferedReader(new InputStreamReader(new GZIPInputStream(input.getValue1()), "UTF-8")));
+    try {
+      return new Pair<File,BufferedReader>(input.getValue0(), new BufferedReader(new InputStreamReader(new GZIPInputStream(input.getValue1()), "UTF-8")));
+    } catch ( IOException e) {
+      // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+    return null;
   }
   
   public static BufferedReader getGzipFileReader(String bucket, String key) throws IOException {
@@ -283,7 +292,7 @@ public class S3Util {
   
   
   public static String tempDir() {
-      return "/tmp";
+      return Config.getOrDefault("tmp_location", "/tmp");
   }
   
   
@@ -303,26 +312,22 @@ public class S3Util {
     }
   }
   
-  public static Pair<File,InputStream> getS3ObjInputStreamCached(String bucket, String key, String directory) throws InterruptedException, S3Exception {
+  public static Pair<File,InputStream> getS3ObjInputStreamCached(String bucket, String key, String directory)  {
     
     // Init 
     final String dirPath = directory + "/" + key;
+    
     final String filePath = dirPath + "/content";
     final String readyPath = dirPath + "/READY";
     final String lockPath = dirPath + "/LOCK";
+    File dirFile = new File(dirPath);
+    FileUtils.deleteQuietly(dirFile);
+    
+    File readyFile = new File(readyPath);
+    File file = new File(filePath);
     do {
-      
-      // Can we read this file? 
-      File readyFile = new File(readyPath);
-      File file = new File(filePath);
-      if (readyFile.exists() && file.exists()) {
-        try {
-          return new Pair<File,InputStream>(file, new FileInputStream(file));
-        } catch (FileNotFoundException e) {
-          throw new S3Exception(e);
-        }
-      }
-      
+      // No caching. All s3 content should be re-downloaded.
+
       // Let's try to get a lock...
       try (final MultiLock lock = FileLockUtil.lock(lockPath)) {
  
@@ -341,10 +346,10 @@ public class S3Util {
  
         // Release
         _log.debug("Caching content done. File: " + readyPath);
-      } catch (IOException e) {
-        throw new S3Exception(Utils.handleInterruptible(e));
-      } catch(ServiceException e) {
-        throw new S3Exception(e);
+        return new Pair<File,InputStream>(dirFile, new FileInputStream(file));
+
+      } catch (IOException  | ServiceException | InterruptedException e) {
+        // Eat the error
       }
     
     } while (true);

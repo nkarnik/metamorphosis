@@ -224,7 +224,6 @@ public class MetamorphosisSourceSinkTest {
     assertEquals(976, totalSunk);
       
     } catch (S3ServiceException e) {
-      // TODO Auto-generated catch block
       _log.error(ExceptionUtils.getStackTrace(e));
 
     }

@@ -60,7 +60,7 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       
       client = CuratorFrameworkFactory.builder()
           //.namespace("gmb")
-          .retryPolicy(new ExponentialBackoffRetry(1000, 10))
+          .retryPolicy(new ExponentialBackoffRetry(1000, 100))
           .connectString(kafkaService.getZKConnectString("gmb"))
           .build();
       client.start();

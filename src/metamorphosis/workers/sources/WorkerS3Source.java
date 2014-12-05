@@ -36,16 +36,11 @@ public class WorkerS3Source extends WorkerSource {
 
   @Override
   public Pair<File, Iterable<String>> getMessageIterator() {
-    try {
-      Pair<File, BufferedReader> cachedGzipFileReaderPair = S3Util.getCachedGzipFileReader(_bucketName, _shardPath);
-      _bufferedShardReader = cachedGzipFileReaderPair.getValue1();
-      _brIterable = new BufferedReaderIterable(_bufferedShardReader);
-      
-      return new Pair<File, Iterable<String>>(cachedGzipFileReaderPair.getValue0(),_brIterable);
-    } catch (IOException | InterruptedException | S3Exception e) {
-      _log.info("Failed to get s3 shard path: " + _shardPath);
-    }
-    return null;
+    Pair<File, BufferedReader> cachedGzipFileReaderPair = S3Util.getCachedGzipFileReader(_bucketName, _shardPath);
+    _bufferedShardReader = cachedGzipFileReaderPair.getValue1();
+    _brIterable = new BufferedReaderIterable(_bufferedShardReader);
+
+    return new Pair<File, Iterable<String>>(cachedGzipFileReaderPair.getValue0(),_brIterable);
   }
   
   public void shutdown(){

@@ -94,24 +94,19 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       
       _log.debug("Using cached iterator for topic: " + clientName);
       sinkTopicIterator = _topicToIteratorCache.get(clientName);
-      // TODO: Maybe the iterator is in a bad state? Confirm before proceeding
-
     }else{
-      Properties props = KafkaUtils.getDefaultProperties(_kafkaService.getZKConnectString("kafka"), clientName);
-      props.put("consumer.timeout.ms", Config.singleton().getOrException("kafka.consumer.timeout.ms"));
-      _consumer = kafka.consumer.Consumer.createJavaConsumerConnector(new ConsumerConfig(props));
-      _log.debug("New consumer created: " + _consumer.hashCode());
-      
-      Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
-      topicCountMap.put(topic, new Integer(1)); // This consumer will only have one thread
-      StringDecoder stringDecoder = new StringDecoder(new VerifiableProperties());
-      
-      sinkTopicIterator = _consumer.createMessageStreams(topicCountMap, stringDecoder, stringDecoder).get(topic).get(0).iterator();
-      _log.info("Consumer " + clientName + " instantiated");
-      _topicToIteratorCache.put(clientName,sinkTopicIterator);
+      sinkTopicIterator = createConsumerIterator(topic, clientName);
     }
-
-    long sunkTuples = workerSink.sink(sinkTopicIterator, _queueNumber, done);// If done, sinkUntilTimeout.
+    Long sunkTuples = null;
+    
+    do{
+      try{
+        sunkTuples = workerSink.sink(sinkTopicIterator, _queueNumber, done);// If done, sinkUntilTimeout.
+        break;
+      }catch(IllegalStateException e){
+        sinkTopicIterator = createConsumerIterator(topic, clientName);
+      }
+    }while(true);
     if(sunkTuples > 0){
       _log.info("Sunk #" + sunkTuples + " tuples for topic: " + topic);
       try{
@@ -174,6 +169,24 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       
       producer.close();
     }
+  }
+
+  private ConsumerIterator<String, String> createConsumerIterator(String topic,
+      String clientName) {
+    ConsumerIterator<String, String> sinkTopicIterator;
+    Properties props = KafkaUtils.getDefaultProperties(_kafkaService.getZKConnectString("kafka"), clientName);
+    props.put("consumer.timeout.ms", Config.singleton().getOrException("kafka.consumer.timeout.ms"));
+    _consumer = kafka.consumer.Consumer.createJavaConsumerConnector(new ConsumerConfig(props));
+    _log.debug("New consumer created: " + _consumer.hashCode());
+    
+    Map<String, Integer> topicCountMap = new HashMap<String, Integer>();
+    topicCountMap.put(topic, new Integer(1)); // This consumer will only have one thread
+    StringDecoder stringDecoder = new StringDecoder(new VerifiableProperties());
+    
+    sinkTopicIterator = _consumer.createMessageStreams(topicCountMap, stringDecoder, stringDecoder).get(topic).get(0).iterator();
+    _log.info("Consumer " + clientName + " instantiated");
+    _topicToIteratorCache.put(clientName,sinkTopicIterator);
+    return sinkTopicIterator;
   }
 
   @Override

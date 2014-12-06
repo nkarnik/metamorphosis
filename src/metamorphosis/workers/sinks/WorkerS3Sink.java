@@ -16,6 +16,7 @@ import metamorphosis.utils.s3.S3Exception;
 import metamorphosis.utils.s3.S3Util;
 import net.sf.json.JSONObject;
 
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.log4j.Logger;
 
 import com.google.common.base.Joiner;
@@ -142,7 +143,8 @@ public class WorkerS3Sink extends WorkerSink {
         _log.debug("Copied " + _gzFilePath + " to " + _shardFull);
         return true;
       } catch (S3Exception | IOException e) {
-        _log.error("Flush failed: ", e);
+        _log.error("Flush failed! ");
+        _log.error(ExceptionUtils.getStackTrace(e));
         return false;
       } finally {
         if(gzFile != null && gzFile.exists())

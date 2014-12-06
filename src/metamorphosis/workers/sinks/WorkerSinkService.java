@@ -94,8 +94,6 @@ public class WorkerSinkService extends WorkerService<WorkerSink> {
       
       _log.debug("Using cached iterator for topic: " + clientName);
       sinkTopicIterator = _topicToIteratorCache.get(clientName);
-      // TODO: Maybe the iterator is in a bad state? Confirm before proceeding
-
     }else{
       sinkTopicIterator = createConsumerIterator(topic, clientName);
     }

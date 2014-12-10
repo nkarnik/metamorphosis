@@ -398,7 +398,7 @@ public class S3Util {
         s3Service = new RestS3Service(AWS_CREDENTIALS);
         break;
       } catch (S3ServiceException e) {
-        throw new S3Exception(e);
+        // do nothing, keep looping
       }
     } while(true);
     
@@ -408,10 +408,8 @@ public class S3Util {
       try {
         s3obj = new S3Object(localFile);
         break;
-      } catch (NoSuchAlgorithmException e) {
-        throw new S3Exception(e);
-      } catch (IOException e) {
-        throw new S3Exception(e);
+      } catch (NoSuchAlgorithmException | IOException e) {
+        // do nothing, keep looping
       }
     } while(true);
 
@@ -426,8 +424,7 @@ public class S3Util {
         mpUtils.uploadObjects(bucket, s3Service, objectsToUploadAsMultipart, null);
         break;
       } catch (Exception e) {
-        // Unfortunately we *must* catch Exception here since that is the signature of mpUtils.uploadObjects.
-        throw new S3Exception(e);
+        // do nothing, keep looping
       }
     } while(true);
   }

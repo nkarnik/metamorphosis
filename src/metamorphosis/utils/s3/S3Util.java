@@ -380,6 +380,7 @@ public class S3Util {
     }
 
   }
+  
   public static void main(String[] args) throws S3Exception, S3ServiceException {
     long t = System.currentTimeMillis();
     S3Object[] s3Objects = S3Util.listPath("fatty.zillabyte.com", "data/homepages/2014/0620/");
@@ -392,33 +393,40 @@ public class S3Util {
 
   public static void copyFile(File localFile, String bucket, String path) throws S3Exception {
     RestS3Service s3Service;
-    try {
-      s3Service = new RestS3Service(AWS_CREDENTIALS);
-    } catch (S3ServiceException e) {
-      throw new S3Exception(e);
-    }
+    do {
+      try {
+        s3Service = new RestS3Service(AWS_CREDENTIALS);
+        break;
+      } catch (S3ServiceException e) {
+        // do nothing, keep looping
+      }
+    } while(true);
     
     List<StorageObject> objectsToUploadAsMultipart = new ArrayList<>();
     S3Object s3obj;
-    try {
-      s3obj = new S3Object(localFile);
-    } catch (NoSuchAlgorithmException e) {
-      throw new S3Exception(e);
-    } catch (IOException e) {
-      throw new S3Exception(e);
-    }
+    do {
+      try {
+        s3obj = new S3Object(localFile);
+        break;
+      } catch (NoSuchAlgorithmException | IOException e) {
+        // do nothing, keep looping
+      }
+    } while(true);
+
     s3obj.setKey(path);
     objectsToUploadAsMultipart.add(s3obj);
 
     long maxSizeForAPartInBytes = 5 * 1024 * 1024;
     MultipartUtils mpUtils = new MultipartUtils(maxSizeForAPartInBytes);
 
-    try {
-      mpUtils.uploadObjects(bucket, s3Service, objectsToUploadAsMultipart, null);
-    } catch (Exception e) {
-      // Unfortunately we *must* catch Exception here since that is the signature of mpUtils.uploadObjects.
-      throw new S3Exception(e);
-    }
+    do {
+      try {
+        mpUtils.uploadObjects(bucket, s3Service, objectsToUploadAsMultipart, null);
+        break;
+      } catch (Exception e) {
+        // do nothing, keep looping
+      }
+    } while(true);
   }
 
 

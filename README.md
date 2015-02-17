@@ -3,7 +3,7 @@ metamorphosis
 
 # What is metamorphosis? 
 
-This project is responsible for ALL data going in and out of GMB (Data set wise, custom sources are not part of this)
+This project is responsible for ALL data going in and out of an external data processing Service (Storm, Hadoop, Spark)
 
 # How is it structured?
 
@@ -13,7 +13,7 @@ The project is a glorified mapper. The two main classes are `SchlossService` and
 
 The SchlossService will run on the kafka_zookeeper node for the environment. The WorkerServices are currently run on the kafka_brokers themselves. Expect this to change
 
-# What are the messages that GMB sends to metamorphosis?
+# What are the messages that External Data Sources (Storm, Hadoop, Spark, etc.) send to metamorphosis?
 
 There are two classes of messages: Source and Sink. Sources need to be loaded from a source type (s3/kinesis), into a kafka topic. Sinks need to do the reverse, take messages from the kafka topics. 
 
@@ -25,5 +25,5 @@ Each message schloss expects that a worker will be assigned to this task as soon
 
 ## Streaming
 
-When sinking from a buffer that GMB is writing to, we have to keep looking at the topic for updated messages. In between these checks we round-robin to see of other topics have new messages. Same for kinesis reads.
+When sinking from a buffer that Storm/Hadoop/Spark is writing to, we have to keep looking at the topic for updated messages. In between these checks we round-robin to see of other topics have new messages. Same for kinesis reads.
 

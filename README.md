@@ -3,7 +3,7 @@ metamorphosis
 
 # What is metamorphosis? 
 
-This project is responsible for ALL data going in and out of an external data processing Service (Storm, Hadoop, Spark)
+This project is responsible for ALL data going in and out of an external data computing service (Storm, Hadoop, Spark)
 
 # How is it structured?
 

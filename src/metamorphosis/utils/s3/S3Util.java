@@ -45,7 +45,7 @@ public class S3Util {
 
   
   public static String S3_ACCESS_KEY = "AKIAJWZ2I3PMFF5O6PFA";
-  public static String S3_SECRET_KEY = "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";
+  //public static String S3_SECRET_KEY = "F9rmZ36zlk2rNNRunsbYQh53+OF6rPdzy6HtI6bf";
   private static final AWSCredentials AWS_CREDENTIALS = new AWSCredentials(S3_ACCESS_KEY, S3_SECRET_KEY);
   
   private static Logger _log = Logger.getLogger(S3Util.class);
